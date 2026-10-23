@@ -43,7 +43,8 @@ See the [step-by-step Windows guide](docs/windows/SETUP-INSTRUCTIONS.md) for ins
 - Existing-login reuse: environment token, GitHub CLI, Windows VS Code session, then OAuth device flow.
 - Copilot endpoint discovery for individual and organizational accounts, plus explicit GitHub host selection for enterprise managed users.
 - Metadata-driven context windows and Anthropic-format overflow errors; no usage multipliers or automatic history truncation.
-- Local React dashboard: status, usage heatmap, latency, request log, observed limits and settings.
+- Local React dashboard: status, usage heatmap, latency, request explorer, observed limits and settings. Explore dates, models and outcomes; pause live logs without stopping the proxy.
+- Secret previews are masked until revealed. Copy actions identify credentials, and disabling the proxy API key requires confirmation.
 - Windows desktop controls and status monitor; single executable CLI builds for other platforms.
 
 The launcher supplies the local provider settings and prepares first-run onboarding. Normal Claude storage, hooks, MCP and tool permissions remain in use; workspace trust and corporate policy still apply.
@@ -103,6 +104,7 @@ Prerequisites: Bun; Python for generated Windows icons and research checks; inst
 bun install --frozen-lockfile
 bun test
 bun run typecheck
+bun run test:ui
 bun run build
 bun run package:windows
 ```
@@ -113,6 +115,8 @@ bun run package:windows
 - Source execution: `bun run build:ui`, then `bun run start` and `bun run claude` in separate terminals.
 
 Source lives in `src/`, dashboard code in `dashboard/`, regression tests in `tests/` and build/diagnostic tools in `scripts/`. Optional research tools write to ignored local directories and are not runtime dependencies.
+
+`test:ui` uses installed Google Chrome in headless mode with synthetic API responses. It checks secret handling, confirmation, filters, live-log pause/resume, chart descriptions and desktop/mobile layouts. Screenshots and traces stay in ignored `test-results/`. These tests make no Copilot model calls.
 
 ## Privacy and compatibility
 

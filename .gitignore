@@ -19,3 +19,5 @@ config.local.json
 runtime.json
 desktop-status.json
 desktop-registration.json
+test-results/
+playwright-report/

@@ -5,6 +5,15 @@ import type { RequestRecord } from "../proxy/server";
 const safeEnums=new Set(["user","assistant","system","developer","text","image","tool_use","tool_result","thinking","enabled","disabled","adaptive"]);
 const protocolKeys=new Set(["model","messages","system","tools","tool_choice","metadata","content","role","type","text","name","id","tool_use_id","input","input_schema","thinking","signature","source","media_type","data","is_error","max_tokens","stream","temperature","top_p","stop_sequences","budget_tokens","output_config","format","schema","cache_control"]);
 const opaqueKeys=new Set(["input","input_schema","schema","metadata"]);
+export type MetricsFilter={from?:number;to?:number;model?:string;status?:"success"|"error"|"429"};
+function selection(filter:MetricsFilter={},since?:number){
+  const clauses:string[]=[],params:(string|number)[]=[];
+  if(filter.from!==undefined||since!==undefined){clauses.push("at>=?");params.push(filter.from??since!);}
+  if(filter.to!==undefined){clauses.push("at<?");params.push(filter.to);}
+  if(filter.model){clauses.push("model=?");params.push(filter.model);}
+  if(filter.status){clauses.push(filter.status==="success"?"status<400":filter.status==="429"?"status=429":"status>=400");}
+  return {where:clauses.length?`WHERE ${clauses.join(" AND ")}`:"",params};
+}
 export function redactStructure(value:any,key="",depth=0):any {
   if(depth>16)return "[redacted: depth limit]";
   if(opaqueKeys.has(key))return "[redacted: structured content]";
@@ -29,20 +38,22 @@ export class MetricsStore {
   refresh(event:{at:number;ok:boolean}){this.db.query("INSERT INTO events(at,type,ok) VALUES(?,'token-refresh',?)").run(event.at,event.ok?1:0);}
   prune(days:number,now=Date.now()){if(!Number.isInteger(days)||days<1)throw new Error("Invalid retention");const boundary=now-days*86400000;
     this.db.transaction(()=>{this.db.query("DELETE FROM requests WHERE at<?").run(boundary);this.db.query("DELETE FROM events WHERE at<?").run(boundary);})();}
-  recent(limit=100,offset=0){return this.db.query("SELECT * FROM requests ORDER BY at DESC LIMIT ? OFFSET ?").all(Math.max(1,Math.min(200,limit)),Math.max(0,offset));}
+  recent(limit=100,offset=0,filter:MetricsFilter={}){const {where,params}=selection(filter);return this.db.query(`SELECT * FROM requests ${where} ORDER BY at DESC LIMIT ? OFFSET ?`).all(...params,Math.max(1,Math.min(200,limit)),Math.max(0,offset));}
   events(){return this.db.query("SELECT * FROM events ORDER BY at DESC LIMIT 50").all();}
-  summary(days=90,now=Date.now()){
+  summary(days=90,now=Date.now(),filter:MetricsFilter={}){
     const since=now-Math.max(1,Math.min(3660,days))*86400000;
+    const {where,params}=selection(filter,since);
     const totals:any=this.db.query(`SELECT COUNT(*) requests,COALESCE(SUM(input),0) input,COALESCE(SUM(output),0) output,
       COALESCE(SUM(cache_read),0) cacheRead,COALESCE(SUM(cache_write),0) cacheWrite,COALESCE(SUM(tools),0) tools,
       COALESCE(SUM(status>=400),0) errors,COALESCE(SUM(tools>0),0) toolRequests,
-      COUNT(DISTINCT strftime('%Y-%m-%dT%H',at/1000,'unixepoch','localtime')) activeHours FROM requests WHERE at>=?`).get(since);
-    const models=this.db.query("SELECT model,COUNT(*) requests,SUM(input) input,SUM(output) output,SUM(status>=400) errors FROM requests WHERE at>=? GROUP BY model ORDER BY requests DESC").all(since);
-    const daily=this.db.query("SELECT date(at/1000,'unixepoch','localtime') day,COUNT(*) requests,SUM(input) input,SUM(output) output FROM requests WHERE at>=? GROUP BY day ORDER BY day").all(since);
-    const latencies=this.db.query("SELECT latency FROM requests WHERE at>=? ORDER BY latency").all(since) as {latency:number}[];
+      COUNT(DISTINCT strftime('%Y-%m-%dT%H',at/1000,'unixepoch','localtime')) activeHours FROM requests ${where}`).get(...params);
+    const models=this.db.query(`SELECT model,COUNT(*) requests,SUM(input) input,SUM(output) output,SUM(status>=400) errors FROM requests ${where} GROUP BY model ORDER BY requests DESC`).all(...params);
+    const daily=this.db.query(`SELECT date(at/1000,'unixepoch','localtime') day,COUNT(*) requests,SUM(input) input,SUM(output) output FROM requests ${where} GROUP BY day ORDER BY day`).all(...params);
+    const latencies=this.db.query(`SELECT latency FROM requests ${where} ORDER BY latency`).all(...params) as {latency:number}[];
     const percentile=(p:number)=>latencies.length?latencies[Math.max(0,Math.ceil(latencies.length*p)-1)].latency:null;
-    const sessions=this.db.query("SELECT COUNT(*) count,AVG(n) averageRequests,AVG(duration) averageDurationMs FROM (SELECT COUNT(*) n,MAX(at)-MIN(at) duration FROM requests WHERE at>=? AND session<>'' GROUP BY session)").get(since);
-    return {totals:{...totals,errorRate:totals.requests?totals.errors/totals.requests:0,toolRatio:totals.requests?totals.toolRequests/totals.requests:0,p50:percentile(.5),p95:percentile(.95)},models,daily,sessions,days,driver:this.driver};
+    const sessions=this.db.query(`SELECT COUNT(*) count,AVG(n) averageRequests,AVG(duration) averageDurationMs FROM (SELECT COUNT(*) n,MAX(at)-MIN(at) duration FROM requests ${where}${where?" AND":" WHERE"} session<>'' GROUP BY session)`).get(...params);
+    const availableModels=this.db.query("SELECT DISTINCT model FROM requests ORDER BY model").all() as {model:string}[];
+    return {totals:{...totals,errorRate:totals.requests?totals.errors/totals.requests:0,toolRatio:totals.requests?totals.toolRequests/totals.requests:0,p50:percentile(.5),p95:percentile(.95)},models,daily,sessions,days,availableModels:availableModels.map(m=>m.model),driver:this.driver};
   }
   close(){this.db.close();}
 }

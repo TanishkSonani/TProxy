@@ -8,6 +8,7 @@
     "claude": "bun src/cli.ts claude",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "test:ui": "playwright test",
     "build:ui": "vite build --config dashboard/vite.config.ts",
     "build": "bun scripts/build.ts",
     "build:all": "bun scripts/build.ts --all",
@@ -18,6 +19,7 @@
     "research:extension": "python scripts/inspect-extension.py"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/bun": "^1.4.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

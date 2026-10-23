@@ -6,7 +6,7 @@ TProxy is a preview. This document separates implemented behavior from claims th
 
 Windows with an existing VS Code login, Copilot Free and Auto has passed real Claude Code chat, streaming, Read/Edit/Bash, a foreground subagent, safety-classifier requests and token reporting. Installed-package checks exercised start/stop, icon resource changes, authentication reuse and SQLite history preservation.
 
-The last code validation before documentation cleanup passed 64 Bun tests with 383 assertions, TypeScript checking and three Python redaction checks. Tests do not establish every account or provider behavior.
+Backend regression tests and isolated Chrome dashboard tests use synthetic data. Tests do not establish every account or provider behavior.
 
 ## Accounts and models
 
@@ -29,7 +29,7 @@ The last code validation before documentation cleanup passed 64 Bun tests with 3
 - Token refresh has simulated 35-day coverage, not a completed 30-day wall-clock soak.
 - Corporate TLS, unsigned executable restrictions, startup policy and managed Claude settings can block operation. TProxy does not alter organizational controls.
 - The desktop icon needs the monitor running; Explorer may briefly cache its old appearance. Green means local proxy health, not account entitlement or available quota.
-- Browser visual QA remains incomplete; authenticated dashboard HTTP behavior is tested.
+- Desktop/mobile Chrome layouts and key dashboard interactions have automated coverage with synthetic data. Actual screen-reader testing and other browsers remain pending.
 
 ## Privacy and policy
 

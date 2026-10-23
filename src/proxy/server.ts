@@ -6,7 +6,7 @@ import { eventStream,parseSSE,frame } from "./sse";
 import { toResponses,fromResponses,responsesStream,text } from "./responses";
 import { toChat,fromChat,chatStream } from "./chat";
 import { asset } from "../dashboard/ui-assets";
-import type { MetricsStore } from "../dashboard/store";
+import type { MetricsStore,MetricsFilter } from "../dashboard/store";
 import { claudeEnvironment } from "../client/claude-launch";
 import { generateEnvScript } from "../client/env-script";
 import { DeviceFlow } from "../auth/device-flow";
@@ -89,14 +89,21 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
         if(url.pathname.startsWith("/api/")){
           const json=(value:any)=>Response.json(value,{headers:{"cache-control":"no-store"}});
           if(url.pathname==="/api/dashboard-link")return json({url:`http://127.0.0.1:${config.port}/#session=${dashboardKey}`});
-          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:context().tokens,context:context(),auth:auth.status,device:deviceState,limits:client.observedLimits,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
+          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:context().tokens,context:context(),auth:auth.status,device:deviceState,limits:client.observedLimits,limitsObservedAt:client.limitsObservedAt??null,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
           if(url.pathname==="/api/context"&&request.method==="POST"){
             const input=await readJSON(request,65536);if(!input||typeof input!=="object"||Array.isArray(input)||(input.model!==undefined&&typeof input.model!=="string"))throw new ApiError(400,"invalid_request_error","Context options must be an object with an optional model string");
             const mapping=input?.model?{...config.models,default:config.models[input.model]??input.model}:config.models;
             await discoverContext(Object.values(mapping).includes("copilot-auto"));return json(context(mapping));
           }
-          if(url.pathname==="/api/summary")return json(options.metrics?.summary()??null);
-          if(url.pathname==="/api/logs")return json({requests:options.metrics?.recent()??[],events:options.metrics?.events()??[]});
+          if(url.pathname==="/api/summary"||url.pathname==="/api/logs"){
+            const filter:MetricsFilter={};
+            for(const key of ["from","to"] as const){const value=url.searchParams.get(key);if(value!==null){const n=Number(value);if(!/^\d+$/.test(value)||!Number.isSafeInteger(n)||n>8640000000000000)throw new ApiError(400,"invalid_request_error","Invalid date range");filter[key]=n;}}
+            if(filter.from!==undefined&&filter.to!==undefined&&(filter.from>=filter.to||filter.to-filter.from>3660*86400000))throw new ApiError(400,"invalid_request_error","Invalid date range");
+            const model=url.searchParams.get("model"),status=url.searchParams.get("status");
+            if(model){if(model.length>200)throw new ApiError(400,"invalid_request_error","Invalid model filter");filter.model=model;}
+            if(status){if(!["success","error","429"].includes(status))throw new ApiError(400,"invalid_request_error","Invalid status filter");filter.status=status as MetricsFilter["status"];}
+            return url.pathname==="/api/summary"?json(options.metrics?.summary(90,Date.now(),filter)??null):json({requests:options.metrics?.recent(200,0,filter)??[],events:options.metrics?.events()??[],limit:200});
+          }
           if(url.pathname==="/api/catalog")return json([...modelMap.values()].map(m=>({id:m.id,name:m.name,vendor:m.vendor,policy:m.policy,picker:m.model_picker_enabled,endpoints:m.supported_endpoints,limits:m.capabilities?.limits})));
           if(url.pathname==="/api/refresh"&&request.method==="POST"){await auth.account();return json(auth.status);}
           if(url.pathname==="/api/auth/start"&&request.method==="POST"){

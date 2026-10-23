@@ -5,7 +5,7 @@ export type CopilotToken = { token: string; api: string; expiresAt: number; refr
 type Cache = { version:1; credential:Credential; copilot:CopilotToken };
 export class CredentialRejected extends Error {constructor(readonly status:number){super("GitHub credential was rejected; reconnect GitHub");}}
 export type AuthStatus = { source?:string; login?:string; host?:string; api?:string; expiresAt?:number;
-  refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; refreshEvents:{at:number;ok:boolean}[] };
+  refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; quotaUpdatedAt?:number; refreshEvents:{at:number;ok:boolean}[] };
 export function copilotOrigin(value: unknown): string {
   if(typeof value!=="string")throw new Error("Token exchange did not return endpoints.api");
   const url=new URL(value);
@@ -102,7 +102,7 @@ export class TokenManager {
     const responses=await Promise.allSettled([this.request(base+"/user",this.credential.token,true),this.request(base+"/copilot_internal/user",this.credential.token,true)]);
     for(let i=0;i<responses.length;i++){const result=responses[i];if(result.status!=="fulfilled"||!result.value.ok)continue;
       try {const data=await result.value.json() as any;if(i===0)this.status.login=data.login;
-        else Object.assign(this.status,{plan:data.copilot_plan,sku:data.access_type_sku,organizations:data.organization_login_list,quota:data.quota_snapshots});}catch{}
+        else Object.assign(this.status,{plan:data.copilot_plan,sku:data.access_type_sku,organizations:data.organization_login_list,quota:data.quota_snapshots,quotaUpdatedAt:this.now()});}catch{}
     }
   }
   async models(){const token=await this.get();const response=await this.request(token.api+"/models",token.token,false);if(!response.ok)throw new Error(`Model discovery failed (${response.status})`);return response.json() as Promise<any>;}

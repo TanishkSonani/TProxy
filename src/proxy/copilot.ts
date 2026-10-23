@@ -2,6 +2,7 @@ import { TokenManager } from "../auth/token-manager";
 import { ApiError,upstreamError } from "./errors";
 export class CopilotClient {
   observedLimits:Record<string,string>={};
+  limitsObservedAt:number|null=null;
   constructor(readonly auth:TokenManager,private transport:typeof fetch=fetch){}
   async request(path:string,body?:any,headers:Record<string,string>={},signal?:AbortSignal):Promise<Response> {
     if(!["/models","/auto","/responses","/chat/completions","/v1/messages","/v1/messages/count_tokens"].includes(path))throw new ApiError(400,"invalid_request_error","Unsupported provider path");
@@ -14,7 +15,7 @@ export class CopilotClient {
           "Copilot-Integration-Id":"vscode-chat","Editor-Version":"vscode/1.143.1","Editor-Plugin-Version":"copilot-chat/0.71.0",
           "User-Agent":"GitHubCopilotChat/0.71.0","X-GitHub-Api-Version":"2026-08-01","OpenAI-Intent":"conversation-panel",...headers},
         body:body===undefined?undefined:JSON.stringify(body)});
-      for(const [key,value]of response.headers)if(key.startsWith("x-ratelimit-")||key==="retry-after")this.observedLimits[key]=value;
+      for(const [key,value]of response.headers)if(key.startsWith("x-ratelimit-")||key==="retry-after"){this.observedLimits[key]=value;this.limitsObservedAt=Date.now();}
       if(response.status===401&&!authRetried){authRetried=true;await response.body?.cancel();await this.auth.refresh(true);continue;}
       if([500,502,503,504].includes(response.status)&&attempt<2){
         const retry=response.headers.get("retry-after");let delay=retry?Number(retry)*1000:NaN;
