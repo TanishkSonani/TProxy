@@ -20,7 +20,7 @@ const args=process.argv.slice(2),command=args.shift()??"start";
 if(["--help","help","-h"].includes(command)){
   console.log("TProxy\nUsage: tproxy start|stop|status|auth|env|claude|dashboard|desktop|setup|migrate|licenses\nOptions: --port N --config FILE --data-dir DIR --quiet\nClaude: --claude-config-dir DIR -- [Claude Code arguments]\nDesktop: tproxy setup registers shortcuts; tproxy desktop opens controls\nDashboard: tproxy dashboard prints a private access link\nUse tproxy claude for first-run setup and local routing.");process.exit(0);
 }
-if(command==="--version"){console.log("TProxy 0.2.0-preview");process.exit(0);}
+if(command==="--version"){console.log("TProxy 0.2.1-preview");process.exit(0);}
 if(command==="licenses"){console.log(notices);process.exit(0);}
 let configPath:string|undefined,dataDir:string|undefined,port:number|undefined,quiet=false,claudeConfig:string|undefined;
 const childArgs:string[]=[];

@@ -179,9 +179,12 @@ summary {cursor:pointer;font-size:12px;color:#c6b5df}
 .chart-data {margin-top:13px}
 .chart-data>summary {font-size:12px;color:#b8a9cc;width:fit-content}
 .chart-data-scroll {max-height:260px;overflow:auto;margin-top:15px}
-.heatmap {display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:5px;min-width:350px;padding:4px 0 12px}
-.heatmap-scroll {overflow-x:auto}
-.heat {display:inline-block;aspect-ratio:1;border-radius:3px;min-width:10px;border:1px solid #ffffff08}
+.activity-map {width:fit-content;min-width:min(100%,340px);max-width:100%}
+.heatmap {display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,12px);grid-auto-columns:12px;gap:4px;width:max-content;flex-shrink:0}
+.heatmap-scroll {display:flex;gap:10px;overflow-x:auto;padding:4px 0 12px}
+.heatmap-weekdays {display:grid;grid-template-rows:repeat(7,12px);gap:4px;color:#aaa0b7;font-size:12px;line-height:12px;flex-shrink:0}
+.heat,.heat-placeholder {display:inline-block;width:12px;height:12px;flex-shrink:0;border-radius:2px}
+.heat {border:1px solid #ffffff08}
 .level-0 {background:#292630}
 .level-1 {background:#473657}
 .level-2 {background:#70558a}
@@ -189,7 +192,7 @@ summary {cursor:pointer;font-size:12px;color:#c6b5df}
 .level-4 {background:#cab0f4}
 .chart-caption {display:flex;justify-content:space-between;gap:12px;align-items:center;margin:4px 0 0;color:#aaa0b7;font-size:12px;flex-wrap:wrap}
 .chart-caption>span {display:flex;align-items:center;gap:5px}
-.chart-caption .heat {width:11px}
+.chart-caption .heat {width:12px}
 table {width:100%;border-collapse:collapse;font-size:12px}
 th {color:#a9a1b8;font-weight:500;background:#1d1c25;font-size:12px}
 th,td {padding:14px 13px;border-bottom:1px solid var(--border);text-align:left}

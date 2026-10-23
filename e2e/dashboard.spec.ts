@@ -94,3 +94,20 @@ test("charts have descriptions and daily tables; overview and mobile layouts fit
   }
   expect(consoleErrors).toEqual([]);
 });
+test("activity map uses compact fixed cells across date ranges and viewport sizes",async({page},testInfo)=>{
+  await fixture(page);
+  await page.getByRole("button",{name:"Usage",exact:true}).click();
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});
+    for(const days of ["7","30","90"]){
+      await page.getByLabel("Date range",{exact:true}).selectOption(days);
+      const map=page.locator(".heatmap"),cell=map.locator(".heat").first();
+      await expect(cell).toHaveCSS("width","12px");await expect(cell).toHaveCSS("height","12px");
+      await expect(map).toHaveCSS("height","108px");
+      expect((await map.boundingBox())!.width).toBeLessThanOrEqual(236);
+      await expect(map.locator(".heat")).toHaveCount(Number(days));
+    }
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.locator(".panel").filter({has:page.getByRole("heading",{name:"Activity map",exact:true})}).screenshot({path:testInfo.outputPath("compact-activity-map.png")});
+});
