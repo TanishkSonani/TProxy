@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, unlinkS
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
-export type ClaudeConnection = { port: number; key: string; model: string; smallModel: string };
+export type ClaudeConnection = { port: number; key: string; model: string; smallModel: string;sonnetModel?:string;opusModel?:string };
 
 // Return a child environment; never mutate the caller's shell or saved credentials.
 export function claudeEnvironment(connection: ClaudeConnection,
@@ -21,6 +21,9 @@ export function claudeEnvironment(connection: ClaudeConnection,
     ANTHROPIC_AUTH_TOKEN: connection.key,
     ANTHROPIC_MODEL: connection.model,
     ANTHROPIC_SMALL_FAST_MODEL: connection.smallModel,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: connection.smallModel,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: connection.sonnetModel??connection.model,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: connection.opusModel??connection.model,
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_AUTOUPDATER: "1",
     CLAUDE_CODE_ENABLE_TELEMETRY: "0", OTEL_SDK_DISABLED: "true",

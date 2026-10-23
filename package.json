@@ -4,10 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "bun src/cli.ts start",
+    "claude": "bun src/cli.ts claude",
+    "typecheck": "tsc --noEmit",
     "test": "bun test",
     "research:test-redaction": "python -m unittest discover -s scripts -p \"test_*.py\"",
     "research:discover": "bun scripts/discover-copilot.ts",
     "research:preflight": "bun scripts/preflight.ts",
     "research:extension": "python scripts/inspect-extension.py"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/bun": "^1.4.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

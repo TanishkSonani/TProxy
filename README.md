@@ -2,7 +2,9 @@
 
 Local bridge research for Claude Code using account-entitled GitHub Copilot models, including non-Anthropic models. Required plans: individual free, individual paid, business and enterprise. Availability depends on the authenticated account's models, protocol capabilities and policy.
 
-**Current state: M1 Windows auth checkpoint implemented and live-tested; proxy/dashboard still in progress.** Existing VS Code auth and a Windows Credential Manager cache work across process restarts. See [M1 findings](evidence/M1-AUTH.md), [PROTOCOL.md](PROTOCOL.md) and [live findings](evidence/LIVE-2026-10-23.md). Native Claude access remains unverified because the service rejected the tested model.
+**Current state: M2 proxy checkpoint works from source; dashboard/packaging are in progress.** Real Claude Code chat, Read/Edit/Bash, a foreground subagent and automatic recovery from an injected captured overflow error passed through the proxy. Existing VS Code auth and Windows Credential Manager cache work across restarts. See [M2 findings and remaining gates](evidence/M2-PROXY.md), [M1 auth](evidence/M1-AUTH.md), and [PROTOCOL.md](PROTOCOL.md). Native Claude generation is still unavailable in the tested account path.
+
+From the repository, run `bun install`, then `bun run start` in one terminal and `bun run claude` in another. The launcher uses your existing Claude executable, sets local routing and avoids Anthropic sign-in. Alternatively, `bun src/cli.ts claude` starts an owned proxy for that session if none is running. `bun src/cli.ts status`, `stop`, `auth`, and `env` provide management. Default data storage is the user's local ghcp-bridge directory; `--data-dir`, `--config` and `--port` override it. API keys are stored in the OS vault on Windows; do not paste `env` output into logs or commit it.
 
 ```powershell
 bun run research:preflight
