@@ -1,100 +1,123 @@
-# GHCP → Claude bridge protocol evidence
+# GHCP → Claude bridge protocol
 
-Research date: 2026-10-23. **M0 incomplete: static findings available; live contract not verified.** Do not use this document to claim Claude Code acceptance, account entitlement, or successful 30-day refresh. No implementation milestones have been completed.
+Research date: **2026-10-23**. This is an M0 evidence checkpoint, not a claim that the bridge or Claude Code acceptance tests are complete. Live Copilot Auto/Responses traffic is verified. Successful native Claude traffic remains unverified because the tested requests were rejected on this account.
 
-## Scope and evidence rules
+## Evidence
 
-Support individual free, individual paid, business, and enterprise accounts. Discover endpoints and model capabilities for the authenticated account. Supporting a plan cannot grant models/features that GitHub does not entitle it to. User scope addition: support non-Anthropic Copilot models in Claude Code through explicit protocol adapters. Claude model requests remain native Messages only. An account without Claude access may select its enabled non-Anthropic models once their adapters pass validation; never silently replace a selected model. See [routing requirements](evidence/MODEL-ROUTING.md).
+Labels: **verified-live** = observed account traffic; **proxy-consensus** = matching inspected implementations; **single-source** = one source, including extension statics; **assumed** = unverified requirement. A model rejection verifies the rejection, not successful generation capabilities.
 
-Confidence labels:
+Precedence: live VS Code capture > reference proxy dynamic capture > proxy consensus > installed extension statics > one reference source. Pinned/live findings supersede initial cached web views.
 
-- **verified-live**: observed on this user's actual account, with dated local evidence.
-- **proxy-consensus**: matching behavior in multiple inspected proxies; shared ancestry reduces independence.
-- **single-source**: one inspected source, including extension statics (marked explicitly).
-- **assumed**: requested design rule or unverified hypothesis, not an observed service fact.
+- VS Code **1.143.1**, bundled Copilot Chat **0.71.0**. Bundle SHA-256: `c69be60325138fd7ce9cfdf066dc146acdf115219b81184b44e984e60b1b8aff`; 19,755,964 bytes.
+- REA **6.7.0** invoked through MCP. GitHub authentication-extension summary analysis succeeded with explicit graph limitations. Full Copilot bundle analysis timed out at 90 and 180 seconds; literal/static inspection and live capture supply the other findings. Full REA analysis must not be reported as successful.
+- Actual VS Code requests were captured in an isolated user-data directory and blank synthetic workspace using a loopback reverse proxy. Only that research instance's CAPI/proxy origins were overridden. Authority/origin was intentionally rewritten; provider bodies, headers and responses were observed live. Normal VS Code settings were unchanged.
+- Source-pinned messense ran in a disposable Linux container. Server and internal mitmdump bound to 127.0.0.1; no container ports were published. Credential input used stdin. Server source was unchanged.
+- Raw captures/private reports are Git-ignored under a Windows user-only ACL. Research listeners/processes were stopped. See [artifact hashes](evidence/ARTIFACT-HASHES.json), [source pins/file hashes](evidence/REFERENCE-PINS.json), [live findings](evidence/LIVE-2026-10-23.md), and [routing requirements](evidence/MODEL-ROUTING.md).
 
-Conflict priority: live VS Code capture > local proxy dynamic capture > proxy consensus > extension static analysis > a single proxy. Source timestamps/crawls vary; current branch URLs below are unpinned and may drift. Immutable clones/revisions are still required before declaring the reference audit complete.
+## Account, credentials and origins
 
-Environment evidence: [ENVIRONMENT.md](evidence/ENVIRONMENT.md). Local extension identity/hash/offsets: [EXTENSION-STATIC.md](evidence/EXTENSION-STATIC.md). Capture procedure: [M0-RUNBOOK.md](evidence/M0-RUNBOOK.md).
-
-## Contract ledger
-
-| Item | Current finding / required bridge behavior | Confidence |
+| Item | Contract/finding | Confidence |
 | --- | --- | --- |
-| GitHub credential source | User authenticated through VS Code. No GH_TOKEN/GITHUB_TOKEN or gh login available in this process. VS Code auth storage key names exist; session validity unknown. Implement env → gh → VS Code → device flow. | assumed (provider design); local preflight observations |
-| Token exchange | GET GitHub API origin + `/copilot_internal/v2/token`, GitHub credential in `Authorization: token …`. | proxy-consensus [S1,S5]; extension static E1 |
-| Response shape | Token response includes a named `endpoints` object/map; use `endpoints.api`, not a plan-derived hostname. `token`, `refresh_in`, and/or `expires_at` drive lifecycle; validate actual response fields live. | single-source [S1]; corroborated by extension E1 |
-| EMU/API host | Extension derives `https://api.<enterprise-host>` from selected enterprise authorization server URL. Do not send a github.com credential to an inferred unrelated tenant. No tenant/live exchange verified. | single-source (extension static E1) |
-| Host selection | Re-discover on refresh. Require HTTPS and validate origin; reject redirects carrying credentials to another origin. No `api.individual.githubcopilot.com` default. | assumed design; discovery source above |
-| Upstream model calls | Claude models use native POST `<endpoints.api>/v1/messages`. Require advertised native Messages capability. No OpenAI translation fallback. | proxy-consensus [S3,S8]; extension static E1 |
-| Non-Anthropic model calls | Additional user requirement: map Claude Code's Messages requests to each enabled model's advertised protocol through a separate adapter. Prefer native Messages if advertised and validated; otherwise implement Responses or Chat Completions adapters as needed. Capability gaps must be explicit; no Claude traffic enters these adapters. | assumed implementation requirement; not validated |
-| Extension location | Discover standard, bundled, portable and custom extension/application layouts using manifest identity. Explicit path overrides cover installations outside known locations. Authentication user-data/profile location is separate. | implemented research discovery; M1 auth discovery pending |
-| Required header candidates | Bearer Copilot token, Copilot-Integration-Id, Editor-Version, Editor-Plugin-Version; JSON Content-Type. Production authenticated reference branch uses `vscode-chat`. Header necessity and signed-in free-plan values need live confirmation. | proxy-consensus [S2,S4]; extension static E1 |
-| Additional header drift | User-Agent, GitHub API version, OpenAI intent, request/interaction/device/session fields vary. Extension statics show API version 2026-08-01; proxies contain older values. Do not blindly copy old constants or local VS Code identifiers. | single-source per value; see drift matrix |
-| Initiator | References disagree: whole-history sticky inference versus last-message/tool-result inference. User requested sticky per conversation, but equivalence to VS Code sequence is unverified. Never derive premium-charge claims from this header. | assumed sticky requirement; conflicting single-source [S9,S8] |
-| Vision | Conditional vision header; inspect images nested in tool_result as well as direct message content. Preserve image source blocks. | proxy-consensus header [S2,S4]; nested detection single-source [S8] |
-| Model catalog | GET `<endpoints.api>/models`; model IDs/capabilities/policy and supported_endpoints determine mapping and availability. | proxy-consensus [S2,S6]; extension static E1 |
-| This account's models | **Unknown. No authenticated catalog fetched.** No default model or slot mapping selected. | assumed / unresolved |
-| System prompt | Native reference sender serializes payload, but preprocessing elsewhere and upstream service rewriting remain unverified. Arbitrary system prompt passthrough cannot yet be claimed. | single-source [S8] for sender only |
-| SSE | Native reference uses upstream streaming. Required downstream Anthropic event families: message_start, content_block_start/delta/stop, message_delta, message_stop, ping; preserve thinking/tool JSON deltas and usage. Actual wire order/chunk boundaries/stop reasons not captured. | assumed downstream contract; single-source native transport [S2,S8] |
-| Usage/request IDs | Preserve actual input/output/cache usage, terminal stop_reason and request IDs. Do not invent usage or turn a disconnected stream into successful message_stop. | assumed implementation rule |
-| max_tokens | User supplied 100..4096 observation is **not re-verified**. Extension uses model max_output_tokens with a 4096 fallback. Treat 100..4096 as provisional configurable bounds pending probes; account/model-specific bounds and thinking budget constraints must be tested. | assumed clamp; single-source extension static E1 |
-| count_tokens | Messense attempts native upstream count; caozhiyuan uses optional direct Anthropic counting or local estimation. This is not evidence Copilot supports it. Probe Copilot first, otherwise return local estimate tagged via response header/dashboard. No direct Anthropic fallback. | conflicting single-source [S3,S10] |
-| Quota | Candidate GET GitHub API origin + `/copilot_internal/user` using GitHub token. Candidate fields include plan, quota_snapshots and reset date. User account endpoint/fields not probed. Missing data displays N/A. | proxy-consensus [S2,S7]; extension static E1 |
-| Account/org | `/user` can identify account; do not infer enterprise membership from a company string. Validate org/seat metadata separately. | assumed; not probed |
-| Context overflow | Required bridge output: HTTP 400 with `{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long"}}`. Need actual Copilot errors AND an oversized-context Claude Code integration test proving auto-compaction. No proxy-side history truncation. | assumed target behavior; critical acceptance gate |
-| Other errors | Anthropic error envelope; 401 authentication_error, 403 permission_error, 429 rate_limit_error, transient 5xx api_error/overloaded_error as appropriate. Respect Retry-After; sanitize upstream messages. Once SSE starts, use Anthropic error events rather than a second HTTP response. | assumed downstream design |
-| Retries | Bounded transient 5xx retries before response bytes; no replay of partially delivered generation. 429 goes back to client with Retry-After. Token refresh uses single-flight and never logs tokens. | assumed design |
-| Persistence | Persist only local redacted metrics in SQLite WAL; tokens in OS keychain, restrictive fallback. Refresh/revocation recovery and 30+ days require simulation plus actual soak evidence; longevity is not guaranteed by an interval timer. | assumed design |
+| Current plan | Metadata reports `copilot_plan: individual`, SKU `free_limited_copilot`. This does not verify paid/enterprise behavior. | verified-live |
+| Existing login | Reused VS Code's stored GitHub session; no new OAuth/device flow. Env credentials and gh login were absent. | verified-live |
+| Windows storage | This build's product metadata points to `.vscode-shared/sharedStorage/state.vscdb`. Secret label: `secret://{"extensionId":"vscode.github-authentication","key":"github.auth"}`. Value is an Electron Buffer JSON with v10 AES-GCM ciphertext; its key is DPAPI-protected in matching VS Code `Local State`. Targeted decryption succeeded as the signed-in Windows user. | verified-live + statics |
+| Location independence | Installation, user-data, profiles and shared-data locations are separate. Discover product metadata/layout; allow explicit custom/portable overrides. Research extension discovery exists; production auth discovery remains M1. | assumed implementation requirement |
+| GitHub account | GET `https://api.github.com/user`, GitHub token auth, API version `2022-11-28`: 200. CAPI's `2026-08-01` version on this public endpoint returned 400. Use endpoint-specific versions. | verified-live |
+| Token exchange | GET GitHub API origin + `/copilot_internal/v2/token`, `Authorization: token <GitHub-token>`: 200. Response includes token, expires_at, refresh_in, named endpoints. Observed refresh_in=86,340 seconds; do not hardcode this TTL. | verified-live |
+| CAPI origin | Returned `endpoints.api` was `https://api.individual.githubcopilot.com`. Always use the returned origin, including after refresh. Other returned origins were not used for telemetry/model calls. | verified-live |
+| Enterprise/EMU | Installed resolver derives GitHub API origin as `api.<selected-enterprise-host>`; CAPI comes from token endpoints. No tenant exchange was available. | single-source, extension statics |
+| Models | GET `<endpoints.api>/models`: 200, 49 advertised entries with mixed enabled/disabled/legacy/non-picker metadata. Catalog policy alone does not establish generation access. [Sanitized catalog](evidence/MODEL-CATALOG.json). | verified-live |
+| Quota | GET GitHub API origin + `/copilot_internal/user`: 200 with plan/quota metadata. Missing fields remain N/A. Initiator labels do not prove premium accounting. | verified-live |
 
-## Reference drift matrix (partial static inspection)
+M1 chain: env → gh → existing VS Code → device flow only when none can be reused. Support all requested plans through discovery, without granting unavailable features. Select account/host explicitly when ambiguous. Never forward credentials across arbitrary origins/redirects, log tokens, or clone VS Code machine identifiers merely because a reference does so. macOS/Linux credential backends and restart/30-day behavior remain unverified.
 
-| Area | messense | ericc-ch | puxu-msft | caozhiyuan | Bridge decision |
+## Free-account Auto handshake
+
+**Verified-live:** direct generation probes for `gpt-6-luna`, `gpt-5.4-mini-free-auto` and `gpt-5.6-luna-free-auto` returned HTTP 400 `model_not_supported`. Actual VS Code revealed an additional handshake:
+
+```http
+POST <endpoints.api>/auto
+Authorization: Bearer <copilot-token>
+Content-Type: application/json
+
+{"prompt":"<current synthetic prompt>","tier":"balance"}
+```
+
+Response fields: `session_token`, `selected_model` (metadata), `expires_at`, `multi_turn`, `multi_turn_mode`, `hydra_scores`. Other tiers/internal score semantics were not established. Observed selection: **gpt-6-luna**. Generation includes **`Copilot-Session-Token: <session_token>`**. With this flow, HTTP non-streaming and SSE `/responses` succeeded. Actual VS Code also succeeded over WebSocket `/responses`.
+
+Treat the session token as a credential; honor expiry and associate it with model selection/conversation. Do not log it, store it in metrics, manufacture one or force an unselected model. Expose an explicit Auto option. If an explicit requested model is unavailable, report that clearly instead of silently substituting Auto's selection.
+
+## Headers and initiator
+
+**Verified-live in current VS Code:** Bearer Copilot auth, `Copilot-Integration-Id: vscode-chat`, `Editor-Version: vscode/1.143.1`, `Editor-Plugin-Version: copilot-chat/0.71.0`, `X-GitHub-Api-Version: 2026-08-01`, intent/interaction/request/task/device/machine/session fields. Presence is observed; necessity of every extra field was not exhaustively tested. Background Chat Completions used user-agent GitHubCopilotChat/0.71.0; the WebSocket upgrade used node.
+
+On the same chat, explicit user → automatic tool continuation → explicit follow-up was **user → agent → user**. WebSocket `response.create` carried a JSON `initiator`; its upgrade had no X-Initiator header. Background HTTP calls carried X-Initiator=agent. Successful direct HTTP probes used X-Initiator and the Auto session header.
+
+This contradicts the proposed blanket sticky-agent rule. Under the specified evidence precedence, explicit user turns stay user and tool continuations stay agent; assistant history alone must not relabel later user turns. Native Claude sequence remains unverified. Reference comments about billing are not evidence of actual charges.
+
+Direct image probes included `Copilot-Vision-Request: true` with valid base64 PNG and succeeded. This confirms accepted behavior on the selected model, not universal header necessity. Detect images nested in tool results too and honor model capability.
+
+## Generation and probes
+
+| Feature | Result / requirement | Confidence |
+| --- | --- | --- |
+| Claude | Native POST `/v1/messages` per reference/source routing; never translate Claude traffic to OpenAI. claude-haiku-4.5 Messages/count_tokens probes returned model_not_supported despite enabled policy metadata. GitHub-bearer variant also failed. | proxy-consensus routing; verified-live rejection |
+| Other vendors | Separate adapter chosen from advertised validated endpoints. Current successful path: Auto-selected gpt-6-luna through Responses. Other models are not certified. | verified-live for this path; assumed for others |
+| WebSocket | GET `/responses` → 101; client response.create includes model/input/options/initiator. Server response.* events include reasoning/functions and terminal usage. | verified-live |
+| HTTP | POST `/responses`, stream=false → response JSON; stream=true → SSE response.* objects. | verified-live |
+| Tools | VS Code exposed 23 tools, emitted function_call, submitted function_call_output on agent continuation and completed. Separate HTTP forced-function/result probes succeeded. Only a synthetic workspace fixture was read. | verified-live |
+| System | HTTP Responses instructions sentinel prevailed over conflicting synthetic user text. This verifies observed behavior/outgoing body, not invisible backend internals or native Claude behavior. | verified-live, Responses |
+| Vision | Valid generated 32×32 base64 PNG accepted. Initial malformed fixture was rejected and corrected. | verified-live, Responses |
+| Reasoning | Actual reasoning items and reasoning-token usage arrived. This does not establish Anthropic thinking-signature compatibility. Never fabricate signatures/private reasoning. | verified-live, Responses |
+| Usage | Real input/output/cached/reasoning usage supplied. Adapters must preserve distinctions; unknown counts are not fabricated zeros. | verified-live |
+| Output limits | Selected gpt-6-luna rejected max_output_tokens=1 with minimum 16. At 16 it returned incomplete with reason=max_output_tokens. Map cutoff to Anthropic max_tokens stop reason. | verified-live |
+| Claude clamp | Supplied 100..4096 claim remains unverified. Use model-specific bounds, including thinking constraints; do not apply assumed Claude bounds to other vendors. | assumed pending native access |
+| count_tokens | Rejected model does not distinguish unsupported counting from unavailable model access. Probe later with accessible native model; otherwise tagged local estimation. No external Anthropic counting fallback. | support unresolved |
+| Anthropic SSE | message_start/content_block_*/message_delta/message_stop/ping, thinking/tool deltas and error events remain M2 implementation/CLI gates. Successful native Anthropic SSE was not captured. | assumed downstream contract |
+| Switching/subagents | Actual Claude Code model switching, subagents and cross-vendor history remain implementation/acceptance tests. Do not silently drop vendor-specific history. | assumed gates |
+
+## Context overflow and downstream errors
+
+Selected model advertised max_prompt_tokens=**872,000**. Synthetic input measured by upstream as **900,002** prompt tokens returned HTTP **400**:
+
+```json
+{"error":{"message":"prompt token count of 900002 exceeds the limit of 872000","code":"model_max_prompt_tokens_exceeded"}}
+```
+
+That is **verified-live**. Map this code and separately verified equivalent overflow codes to:
+
+```json
+{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long"}}
+```
+
+The target remains an **assumed integration requirement until Claude Code actually compacts and continues through the implemented bridge**. Unit tests alone cannot certify compaction. Do not truncate history at the proxy or confuse input overflow with output cutoff.
+
+Planned mappings: 401 authentication_error; 403 permission_error; 429 rate_limit_error plus Retry-After; eligible transient 5xx api_error/overloaded_error. Sanitize errors. After SSE starts, emit an Anthropic error event instead of a second HTTP response. Bound retries to eligible failures before delivery; never replay exposed generations/tool actions. These service failures were not deliberately induced.
+
+## Pinned reference drift
+
+Exact revisions/file links: [REFERENCE-PINS.json](evidence/REFERENCE-PINS.json). Implementation observations are not runtime guarantees.
+
+| Area | messense d5a1583 | ericc-ch 0ea08fe | puxu-msft c09d5b9 | caozhiyuan 64e38da | Bridge decision |
 | --- | --- | --- | --- | --- | --- |
-| Origin | token endpoints.api [S1] | plan-derived [S4] | override or plan-derived [S11] | sender delegates origin [S8]; resolver not audited | discovered endpoint only |
-| Native Messages | native Claude branch, translation for others [S3] | inspected handler translates to chat completions [S12] | not established | native sender [S8] | Claude native only; other models use validated adapters |
-| Initiator | history inference [S9]; current callers may add metadata | full sequence not audited | not established | last user content vs tool result [S8] | capture first; provisional sticky design |
-| Refresh | background + forced refresh [S1] | refresh_in interval, disk GitHub token [S13] | not audited | not audited | account-aware single-flight, expiry guard |
-| Output adaptation | model aliases, thinking→adaptive rewrites [S3] | translation [S12] | not audited | beta allowlist [S8] | verify per model; avoid unconditional rewrites |
-| Count tokens | native attempt for Claude [S3] | not audited | not audited | external Anthropic or estimate [S10] | Copilot or local estimate |
-| Rate handling | no full audit | handler calls limiter [S12] | reactive 429 queue/backoff/recovery [S14] | response headers logged [S8] | honor upstream; bounded retries |
-| Truncation | not audited | not audited | auto-truncate directory present; algorithm/proactive paths not inspected | not audited | no server history truncation |
-| Subagents | not audited | not audited | not audited | custom marker type [S15], sender options [S8] | preserve client metadata; verify protocol |
-| Listener | 0.0.0.0 in inspected entry point [S16] | host not explicit in inspected start [S17] | configurable host documented [S18] | localhost documented [S19] | force 127.0.0.1 |
+| Origin | token endpoints.api | account-type-derived | override or account-type-derived | configured URL/account/tenant resolver | discovered origin, validated account/host |
+| Claude | native branch with body remaps | Messages→Chat Completions | protocol-specific codec pipeline | native Messages sender with optional header/auth rewrite | Claude native only |
+| Other models | CC translator | CC translation | Responses/CC/native codecs | multiple protocol routes | separate tested adapters |
+| Initiator | history sticky + task markers | assistant/tool history→agent | protocol-specific processing | last user non-tool-result→user | current live user→agent→user wins |
+| Slots/models | BIG_MODEL/MIDDLE_MODEL/SMALL_MODEL | --claude-code catalog prompts | endpoint-aware metadata | model mapping/capabilities | exact IDs + explicit Auto |
+| Auth/refresh | device flow/disk + background/forced refresh | device flow/disk + refresh_in interval | credential manager consumed by headers | OAuth/account-aware paths | existing login, protected cache, single-flight |
+| Header versions | API 2026-01-09, plugin 0.26.7 | API 2025-04-01, plugin 0.26.7 | CAPI 2025-05-01 builder | API 2026-08-01; native identity can replace auth/headers | current capture outranks old constants |
+| Auto | missing in tested generation path | not supplied by inspected Messages handler | not established in inspected builder | not established in inspected native sender | current free path needs Auto/session |
+| Count tokens | native attempt for Claude/local otherwise | compatibility surface | pipeline; not live-tested | optional external Anthropic or local estimate | Copilot or local estimate only |
+| Truncation/limits | body remapping/local estimate | optional interval throttle | current retry stack removed auto-truncate; adaptive 429 recovery remains | native sender logs rate headers | no server history truncation; honor actual limits |
+| Betas/subagents | task/header inference | translated tools | protocol processing | beta allowlist + custom marker with agent_type | verify betas; unchanged clients need no custom marker |
+| Bind | current entry defaults 127.0.0.1 | host not explicit in inspected start | configurable | local endpoint documented | explicit loopback only |
 
-E1 denotes the locally hashed extension above. These are implementation observations, not endorsements or successful runtime tests. In particular, source comments about billing do not establish actual premium request accounting.
+The pinned messense listener supersedes the older cached web view showing 0.0.0.0; no bind patch was needed. Dynamic capture verified token/model calls (200), native Claude and direct gpt-6-luna generation rejections (400). It omitted Auto selection/session context and the client's anthropic-version header, and used older API/plugin versions. This comparison does not prove successful Claude generation.
 
-## Live completion gates
+## Remaining gates
 
-- REA setup and MCP invocation against the actual installed bundle; repeat static findings with recorded tool output.
-- Obtain valid existing VS Code session without displaying secrets; capture token exchange and authenticated models/quota requests locally.
-- Capture VS Code synthetic user turn → tool continuation → follow-up user turn; thinking, image and model-switch examples. Determine initiator sequence.
-- Pin all reference revisions, finish uninspected matrix cells, patch reference listener to loopback, capture its upstream requests and diff against VS Code.
-- Probe token bounds, native count_tokens, system sentinel preservation, context-limit error and SSE interruption behavior. Do not promote source evidence to verified-live.
-- Test individual free, individual paid and enterprise separately. Current personal account is the first intended live test, not evidence for the other plans.
-- Inspect supported endpoints and tool/vision/reasoning capabilities of enabled non-Anthropic models; capture their native wire contracts before implementing adapters. Adapter acceptance includes tool continuations, switching, streaming usage and auto-compaction.
-
-## Sources
-
-All remote sources inspected through web tools on the research date; unpinned branch content may change.
-
-- S1: [messense auth.rs](https://raw.githubusercontent.com/messense/copilot-api-proxy/main/src/auth.rs)
-- S2: [messense proxy.rs](https://raw.githubusercontent.com/messense/copilot-api-proxy/main/src/proxy.rs)
-- S3: [messense llm.rs](https://raw.githubusercontent.com/messense/copilot-api-proxy/main/src/llm.rs)
-- S4: [ericc-ch api-config.ts](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/lib/api-config.ts)
-- S5: [ericc-ch get-copilot-token.ts](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/services/github/get-copilot-token.ts)
-- S6: [ericc-ch get-models.ts](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/services/copilot/get-models.ts)
-- S7: [ericc-ch get-copilot-usage.ts](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/services/github/get-copilot-usage.ts)
-- S8: [caozhiyuan create-messages.ts](https://raw.githubusercontent.com/caozhiyuan/copilot-api/dev/src/services/copilot/create-messages.ts)
-- S9: [messense initiator.rs](https://raw.githubusercontent.com/messense/copilot-api-proxy/main/src/initiator.rs)
-- S10: [caozhiyuan count-tokens-handler.ts](https://raw.githubusercontent.com/caozhiyuan/copilot-api/dev/src/routes/messages/count-tokens-handler.ts)
-- S11: [puxu-msft copilot-api.ts](https://raw.githubusercontent.com/puxu-msft/copilot-api-js/master/src/lib/copilot-api.ts)
-- S12: [ericc-ch Messages handler](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/routes/messages/handler.ts)
-- S13: [ericc-ch token.ts](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/lib/token.ts)
-- S14: [puxu-msft adaptive-rate-limiter.ts](https://raw.githubusercontent.com/puxu-msft/copilot-api-js/master/src/lib/adaptive-rate-limiter.ts)
-- S15: [caozhiyuan subagent.ts](https://raw.githubusercontent.com/caozhiyuan/copilot-api/dev/src/lib/subagent.ts)
-- S16: [messense main.rs](https://raw.githubusercontent.com/messense/copilot-api-proxy/main/src/main.rs)
-- S17: [ericc-ch start.ts](https://raw.githubusercontent.com/ericc-ch/copilot-api/master/src/start.ts)
-- S18: [puxu-msft README](https://raw.githubusercontent.com/puxu-msft/copilot-api-js/master/README.md)
-- S19: [caozhiyuan README](https://raw.githubusercontent.com/caozhiyuan/copilot-api/main/README.md)
-- REA: [official installation and CLI instructions](https://github.com/morluto/rea)
+- Accessible native Claude model/account path for successful Messages, thinking, system, vision, limits and counting verification.
+- Separate paid individual, business and enterprise/EMU account captures.
+- Implemented auth/proxy/dashboard/packaging; restart, refresh/revocation and 30+ day soak evidence.
+- Actual Claude Code multi-turn/tool/subagent/model-switch/usage and forced auto-compaction acceptance. No working bridge/dashboard exists yet.

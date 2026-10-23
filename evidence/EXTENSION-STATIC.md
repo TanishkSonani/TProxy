@@ -1,5 +1,7 @@
 # Installed extension static evidence
 
+**Current-run update:** automatic discovery found bundled GitHub.copilot-chat **0.71.0** in build `e646868227`. SHA-256: `c69be60325138fd7ce9cfdf066dc146acdf115219b81184b44e984e60b1b8aff`; 19,755,964 bytes. The reproducible inspection script was rerun against it. REA MCP analysis of the companion GitHub authentication extension succeeded; full Copilot bundle analysis timed out. Current findings and limitations are in [LIVE-2026-10-23.md](LIVE-2026-10-23.md) and the root protocol. The 0.68.0 offsets below are historical and must not be applied to the new bundle.
+
 Observed 2026-10-23. Run `python scripts/inspect-extension.py` to reproduce excerpts locally.
 
 The CLI launcher selects build `07f806f999`, whose bundled extension is **GitHub.copilot-chat 0.68.0**:

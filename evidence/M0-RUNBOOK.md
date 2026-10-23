@@ -1,6 +1,6 @@
 # Complete M0 locally
 
-This is a procedure, not a record of completed captures. Current blockers and attempted commands are in [ENVIRONMENT.md](ENVIRONMENT.md). All artifacts stay local. Use a blank workspace and synthetic prompts; do not capture a corporate project conversation. No raw capture, credential, or private account metadata belongs in a commit.
+This is a rerun procedure. Completed captures and current limitations are recorded in [LIVE-2026-10-23.md](LIVE-2026-10-23.md); the environment document retains the initial restricted-run history. All artifacts stay local. Use a blank workspace and synthetic prompts; do not capture a corporate project conversation. No raw capture, credential, or private account metadata belongs in a commit.
 
 ## 1. Preflight and REA
 
@@ -11,7 +11,7 @@ bun run research:extension
 
 Preflight checks credentials by presence only. Static inspection does not execute extension code. Reports are ignored under `evidence/private/`.
 
-When npm access is available, follow [REA's official setup](https://github.com/morluto/rea): `npx rea-agents setup`. The setup modifies agent configuration and requires an agent restart to expose its MCP tools; it has **not** been run successfully in this session. Do not claim MCP analysis based on the literal-search fallback. Use REA's JavaScript application analysis on the extension root reported by the script. The documented CLI equivalent is:
+For persistent agent registration, follow [REA's official setup](https://github.com/morluto/rea): `npx rea-agents setup`. That modifies agent configuration and requires an agent restart; persistent registration was not changed here. Instead, the installed REA MCP server was invoked directly through `scripts/rea-mcp.py --entry <rea-agents/scripts/rea.mjs>`. It initializes the server and can call a selected tool with local JSON arguments. Use summary detail for large analysis responses. See the live report for successful auth analysis and Copilot timeout limitations. The documented CLI equivalent is:
 
 ```powershell
 npx -y rea-agents analyze-javascript-application "<reported extension root>" --json
@@ -30,7 +30,7 @@ New-Item -ItemType Directory -Force evidence/private | Out-Null
 .research/venv/Scripts/mitmdump --listen-host 127.0.0.1 --listen-port 8089 --set confdir=./evidence/private/mitm-conf -w evidence/private/vscode.mitm
 ```
 
-These commands have not been executed successfully here. This writes raw secrets to local ignored storage: restrict the capture directory with Windows user-only ACLs before starting. Never upload it or paste it into a tool transcript. Use a scoped VS Code process/profile or approved Developer Tools HAR export, not machine-wide proxy settings. Trust the capture certificate only for the dedicated process/profile, retain TLS verification upstream, and remove scoped settings after capture. Do not disable TLS verification globally. mitmdump raw files are not redacted by this repository.
+The local venv and mitmproxy were installed in the follow-up run. Raw captures contain secrets: restrict the capture directory with Windows user-only ACLs before starting. Never upload it or paste it into a tool transcript. Use a scoped VS Code process/profile or approved Developer Tools HAR export, not machine-wide proxy settings. Trust the capture certificate only for the dedicated process/profile, retain TLS verification upstream, and remove scoped settings after capture. Do not disable TLS verification globally. mitmdump raw files are not redacted; `scripts/summarize-capture.py` generates a structural summary without exporting prompt/tool/image strings or secret header values.
 
 Confirm the exact running bundled extension version and route only the dedicated test instance through the capture listener. A separate profile may require selecting the existing GitHub account through VS Code's authentication UI. Merely exporting HTTPS_PROXY may not route Electron or extension-specific transports; validate an actual captured request before proceeding.
 
@@ -40,11 +40,11 @@ Produce a manually reviewed redacted summary with method, origin/path (no secret
 
 ## 3. Pin and inspect reference proxies
 
-Clone each requested repository under ignored `.research/` and record `git rev-parse HEAD`, capture timestamp, branch and SHA-256 of relevant source files. Fetch failures in this session mean current source links in PROTOCOL.md are still unpinned. Finish the cells marked not audited, especially proactive/auto-truncation code, model mapping, header precedence and preprocessing.
+Clone each requested repository under ignored `.research/` and record `git rev-parse HEAD`, capture timestamp, branch and SHA-256 of relevant source files. The current run's four exact revisions and selected file hashes are recorded in REFERENCE-PINS.json. Re-pin before comparing future versions; do not assume behavior from an old README or cached web view.
 
 ## 4. Dynamic messense comparison
 
-Do not start the inspected server unmodified: its entry point binds 0.0.0.0. In the ignored checkout, patch listener binding to **127.0.0.1** and record the exact patch and commit SHA. Review any other listeners or service-install paths. Build in the workspace and run the server subcommand only; do not install a service. Use a different port from the bridge default, e.g. 4142.
+Verify the pinned entry point before starting. Current d5a1583 supports `--host` and defaults to **127.0.0.1**, superseding the earlier cached source view of 0.0.0.0. For older revisions, patch only the bind if needed and record the diff. Review other listeners/service paths. Build locally and run the server subcommand only; do not install a service. Use a different port from the bridge default, e.g. 4142. The completed run used an isolated container with no published ports and both capture/server on internal loopback.
 
 Run a separate loopback mitmdump capture with private output `messense.mitm`. Configure the reference process's HTTP client proxy and scoped CA trust, then verify actual upstream traffic was captured. Supply any credential through the process environment or secure provider, never as a CLI argument or printed log. Avoid debug logging that can emit payloads/tokens.
 

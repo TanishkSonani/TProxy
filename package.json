@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
+    "research:test-redaction": "python -m unittest discover -s scripts -p \"test_*.py\"",
     "research:discover": "bun scripts/discover-copilot.ts",
     "research:preflight": "bun scripts/preflight.ts",
     "research:extension": "python scripts/inspect-extension.py"

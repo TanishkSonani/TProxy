@@ -1,5 +1,7 @@
 # Local M0 observations
 
+**Update after unrestricted access became available:** see [LIVE-2026-10-23.md](LIVE-2026-10-23.md). REA/mitmproxy were installed locally, all reference sources were pinned, the current bundled extension is 0.71.0, and the existing VS Code login was reused through its cross-app shared storage. Live VS Code/Auto/Responses and reference captures succeeded. The observations below describe the initial restricted run and are retained as history, not current blockers.
+
 Recorded 2026-10-23 in `C:\Users\Tanishk\Desktop\ghcpToClaude`.
 
 | Check | Observed result |

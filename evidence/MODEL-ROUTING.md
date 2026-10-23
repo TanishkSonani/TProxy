@@ -2,6 +2,8 @@
 
 User addition, 2026-10-23: Claude Code must also be able to select non-Anthropic models offered by the authenticated GitHub Copilot account. This is planned M2 scope; no adapter is currently implemented.
 
+Live discovery update: the current free account succeeds with an Auto handshake (`POST /auto`, tier balance) followed by `Copilot-Session-Token` on the selected gpt-6-luna Responses request. Direct tested model IDs were rejected despite catalog metadata. Implement explicit Auto selection and session expiry/conversation handling; do not treat all catalog entries or enabled policy flags as selectable. Do not silently change an explicit model request to Auto. Current live initiator sequence is user → agent tool continuation → user follow-up; history alone does not make later user requests agent-initiated.
+
 ## Selection
 
 - Discover enabled model IDs, policy, capabilities, supported endpoints and limits from the account's model catalog; do not assume a model is available because it appears in source or documentation.

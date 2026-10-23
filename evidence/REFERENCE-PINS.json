@@ -1,0 +1,154 @@
+{
+  "recordedAt": "2026-10-23T10:30:37.050430+00:00",
+  "repositories": [
+    {
+      "repository": "messense/copilot-api-proxy",
+      "revision": "d5a1583a2b8f71ba0bb466c0d3720d83a468896d",
+      "files": [
+        {
+          "path": "src/auth.rs",
+          "sha256": "1095409f62628ca376c47a1bada7b61ef751895ed89bf0730e37134e02d58b7b",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/auth.rs"
+        },
+        {
+          "path": "src/config.rs",
+          "sha256": "a7fab955e1cabea410f94b421c6a1455cdd82aa27df7875cf518dbe77f5227b6",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/config.rs"
+        },
+        {
+          "path": "src/claude.rs",
+          "sha256": "74f2da2daefc53a24f394884a276b182075fb5cc822b115beca51e56a9a126fe",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/claude.rs"
+        },
+        {
+          "path": "src/initiator.rs",
+          "sha256": "4b1c7cf1b39ff20ee2e9779074a674be7c1c1c61a95b32d04bc1bfaa3ba91581",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/initiator.rs"
+        },
+        {
+          "path": "src/llm.rs",
+          "sha256": "43a8f4d9c25196c780dc6861dd73df0a5f3460a22a69c86e385588d1626ff5ab",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/llm.rs"
+        },
+        {
+          "path": "src/proxy.rs",
+          "sha256": "0bbe1eab0dbbff00fd53313056f11447e86e4893ffa2a841c9f7733b34a9751b",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/proxy.rs"
+        },
+        {
+          "path": "src/main.rs",
+          "sha256": "fa5c44f1e73797d39565c4e80b271e0b972a216207fa5dd98f41f2c4b9662560",
+          "url": "https://github.com/messense/copilot-api-proxy/blob/d5a1583a2b8f71ba0bb466c0d3720d83a468896d/src/main.rs"
+        }
+      ]
+    },
+    {
+      "repository": "ericc-ch/copilot-api",
+      "revision": "0ea08febdd7e3e055b03dd298bf57e669500b5c1",
+      "files": [
+        {
+          "path": "src/lib/api-config.ts",
+          "sha256": "007ea8f9edec4882cbb92c8c2cfd97f7d2bcb85d27eff871adbaa313241690fa",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/lib/api-config.ts"
+        },
+        {
+          "path": "src/lib/token.ts",
+          "sha256": "149fc49feeaa5df474ca589b29658294ea57a1b4839c5f67541183ebc54efb23",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/lib/token.ts"
+        },
+        {
+          "path": "src/lib/rate-limit.ts",
+          "sha256": "b658e944f0ba7718d6637eeccaf7b95eba1749d4ef274aaa660f0eeef5adf6a5",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/lib/rate-limit.ts"
+        },
+        {
+          "path": "src/services/github/get-device-code.ts",
+          "sha256": "66f6e2f4769ef96edcadda694d9f77a67ff19f2e03c6fb156f1975fcd5a6a7bb",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/services/github/get-device-code.ts"
+        },
+        {
+          "path": "src/services/github/poll-access-token.ts",
+          "sha256": "9c7227b0a5602f3d168a02168ad8a91f01cf6029ec110a35ec9733f8ee4e863d",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/services/github/poll-access-token.ts"
+        },
+        {
+          "path": "src/services/github/get-copilot-token.ts",
+          "sha256": "baffd164f2f260e5784c7d11c9a8d13df40f5b0d28ff50a2d16c3e8ceb5b2b55",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/services/github/get-copilot-token.ts"
+        },
+        {
+          "path": "src/routes/messages/handler.ts",
+          "sha256": "914027819f7fd4aafb411647ec4a0fb3719801150a2d25272c794bc34f574e8c",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/routes/messages/handler.ts"
+        },
+        {
+          "path": "src/start.ts",
+          "sha256": "cb6d98f287891edaae1152c0f9e2057e5e04c17fd23ea5f9b3f979ef39d5415e",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/start.ts"
+        }
+      ]
+    },
+    {
+      "repository": "puxu-msft/copilot-api-js",
+      "revision": "c09d5b9ad5fe17aee919eab7c48cdfabd77ba58e",
+      "files": [
+        {
+          "path": "src/lib/copilot-api.ts",
+          "sha256": "84b396d99e55f32ab0ed60d65c9db271a5a6d127b6472c4f291a534eb6dd3894",
+          "url": "https://github.com/puxu-msft/copilot-api-js/blob/c09d5b9ad5fe17aee919eab7c48cdfabd77ba58e/src/lib/copilot-api.ts"
+        },
+        {
+          "path": "src/lib/adaptive-rate-limiter.ts",
+          "sha256": "98067ab0191e9927207cc03b4d9f060e6eb4e299fea6142a46b2508849631d9f",
+          "url": "https://github.com/puxu-msft/copilot-api-js/blob/c09d5b9ad5fe17aee919eab7c48cdfabd77ba58e/src/lib/adaptive-rate-limiter.ts"
+        },
+        {
+          "path": "src/lib/pipeline/cell-assembly.ts",
+          "sha256": "8b64462a56b77a8be2fcf565dd68b8e318450236c4ce1a69078f70f799f48960",
+          "url": "https://github.com/puxu-msft/copilot-api-js/blob/c09d5b9ad5fe17aee919eab7c48cdfabd77ba58e/src/lib/pipeline/cell-assembly.ts"
+        },
+        {
+          "path": "src/lib/codec/cc-family-strategies.ts",
+          "sha256": "5bfaf1a05b916f2105e291dbc2d73208d25d54224f9ffb289e03d0d83fd0aab9",
+          "url": "https://github.com/puxu-msft/copilot-api-js/blob/c09d5b9ad5fe17aee919eab7c48cdfabd77ba58e/src/lib/codec/cc-family-strategies.ts"
+        }
+      ]
+    },
+    {
+      "repository": "caozhiyuan/copilot-api",
+      "revision": "64e38da1eb79eeda6c8b660d585754c0c8f5dc00",
+      "files": [
+        {
+          "path": "src/lib/api-config.ts",
+          "sha256": "4aa35e269a4113754a9247b3492f81ce66d115ff5b47124eddfc2693955f2494",
+          "url": "https://github.com/caozhiyuan/copilot-api/blob/64e38da1eb79eeda6c8b660d585754c0c8f5dc00/src/lib/api-config.ts"
+        },
+        {
+          "path": "src/services/copilot/create-messages.ts",
+          "sha256": "80e0b7dd19a037cc642b70e9645807406b32e3ae8d33f19974d0b42876d67dbe",
+          "url": "https://github.com/caozhiyuan/copilot-api/blob/64e38da1eb79eeda6c8b660d585754c0c8f5dc00/src/services/copilot/create-messages.ts"
+        },
+        {
+          "path": "src/routes/messages/count-tokens-handler.ts",
+          "sha256": "fa2a4c54fc9068aac28ae5278bfc55f3e48657da4f8bb987a2a0b099f22245b5",
+          "url": "https://github.com/caozhiyuan/copilot-api/blob/64e38da1eb79eeda6c8b660d585754c0c8f5dc00/src/routes/messages/count-tokens-handler.ts"
+        },
+        {
+          "path": "src/lib/subagent.ts",
+          "sha256": "315b2f63a4b8844101db803e2297f94665f696faabbcc8e97aa9ff7416524ad0",
+          "url": "https://github.com/caozhiyuan/copilot-api/blob/64e38da1eb79eeda6c8b660d585754c0c8f5dc00/src/lib/subagent.ts"
+        },
+        {
+          "path": "src/routes/messages/preprocess.ts",
+          "sha256": "1e0e2bf86712ee71772a7c4e3cae9b45504a688ab00a98ce869a417903a4dd37",
+          "url": "https://github.com/caozhiyuan/copilot-api/blob/64e38da1eb79eeda6c8b660d585754c0c8f5dc00/src/routes/messages/preprocess.ts"
+        },
+        {
+          "path": "src/services/github/get-copilot-token.ts",
+          "sha256": "2318ce7abffe64f491155752887062a7a40ea06006ea0a1ecf2820df6d5e77f7",
+          "url": "https://github.com/caozhiyuan/copilot-api/blob/64e38da1eb79eeda6c8b660d585754c0c8f5dc00/src/services/github/get-copilot-token.ts"
+        }
+      ]
+    }
+  ]
+}
