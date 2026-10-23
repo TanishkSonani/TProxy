@@ -23,4 +23,3 @@ const report = {
 mkdirSync("evidence/private", { recursive: true });
 writeFileSync("evidence/private/preflight.json", JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
-
