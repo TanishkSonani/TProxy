@@ -1,0 +1,10 @@
+.research/
+evidence/private/
+node_modules/
+dist/
+*.sqlite*
+.env
+.env.*
+__pycache__/
+*.pyc
+
