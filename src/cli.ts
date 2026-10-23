@@ -3,7 +3,8 @@ import { existsSync,mkdirSync,writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { join,resolve } from "node:path";
-import { loadConfig } from "./config";
+import { loadConfig,saveConfig } from "./config";
+import { MetricsStore } from "./dashboard/store";
 import { secretStore } from "./auth/secure-store";
 import { TokenManager } from "./auth/token-manager";
 import { DeviceFlow } from "./auth/device-flow";
@@ -42,10 +43,20 @@ try {
       finally{auth.stop();}
     } else {
       let proxy:Awaited<ReturnType<typeof startProxy>>|undefined;
+      const boot=async()=>{
+        const metrics=new MetricsStore(join(config.dataDir,"metrics.sqlite"));metrics.prune(config.retentionDays);
+        const unsubscribe=auth.onRefresh(event=>metrics.refresh(event));
+        const timer=setInterval(()=>metrics.prune(config.retentionDays),6*60*60*1000);timer.unref();
+        let closed=false;const cleanup=()=>{if(closed)return;closed=true;clearInterval(timer);unsubscribe();metrics.close();};
+        try{try{await auth.initialize();}catch(error){if(!(error instanceof Error)||!error.message.startsWith("AUTH_REQUIRED"))throw error;}
+          const running=await startProxy(auth,{...config,key},{metrics,saveSettings:settings=>{Object.assign(config,settings);saveConfig(configPath??join(config.dataDir,"config.json"),config);},onStop:()=>{cleanup();process.exit(0);}});
+          const stop=running.stop.bind(running);running.stop=()=>{stop();cleanup();};return running;
+        }catch(error){cleanup();auth.stop();throw error;}
+      };
       if(command==="claude") {
         try {const response=await localRequest("/api/status");if(!response.ok)throw new Error("Bridge running with another credential/profile");}
-        catch(error){if(error instanceof Error&&error.message.startsWith("Bridge running"))throw error;await auth.initialize();proxy=await startProxy(auth,{...config,key});}
-      } else {await auth.initialize();proxy=await startProxy(auth,{...config,key},{onStop:()=>process.exit(0)});}
+        catch(error){if(error instanceof Error&&error.message.startsWith("Bridge running"))throw error;proxy=await boot();}
+      } else {proxy=await boot();}
       if(command==="start"){
         console.log(`GHCP Bridge listening on ${url}; auth=${auth.status.source}; account=${auth.status.login??"unknown"}`);
         if(!quiet)console.log("Launch with: ghcp-bridge claude\nCopy shell settings with: ghcp-bridge env");

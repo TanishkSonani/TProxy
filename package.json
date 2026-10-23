@@ -8,6 +8,7 @@
     "claude": "bun src/cli.ts claude",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "build:ui": "vite build --config dashboard/vite.config.ts",
     "research:test-redaction": "python -m unittest discover -s scripts -p \"test_*.py\"",
     "research:discover": "bun scripts/discover-copilot.ts",
     "research:preflight": "bun scripts/preflight.ts",

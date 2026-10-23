@@ -17,9 +17,10 @@ export function copilotOrigin(value: unknown): string {
 export class TokenManager {
   private credential?:Credential;private token?:CopilotToken;private inflight?:Promise<CopilotToken>;private timer?:ReturnType<typeof setTimeout>;
   private stopped=false;
+  private listeners=new Set<(event:{at:number;ok:boolean})=>void>();
   status:AuthStatus;
   constructor(private store:SecretStore, private options:AuthOptions={}, private deps:{fetch?:typeof fetch;now?:()=>number;provider?:(options:AuthOptions)=>Promise<Credential|null>;background?:boolean}={}) {
-    this.status={storage:store.kind,refreshEvents:[]};
+    this.status={storage:store.kind,refreshEvents:[],host:options.githubHost??process.env.GH_HOST??"github.com"};
   }
   private now(){return (this.deps.now??Date.now)();}
   private async request(url:string,token:string,github:boolean,body?:unknown,signal?:AbortSignal) {
@@ -85,7 +86,8 @@ export class TokenManager {
       finally{this.inflight=undefined;}
     })();return this.inflight;
   }
-  private event(ok:boolean){this.status.refreshEvents.push({at:this.now(),ok});this.status.refreshEvents=this.status.refreshEvents.slice(-100);}
+  onRefresh(listener:(event:{at:number;ok:boolean})=>void){this.listeners.add(listener);return ()=>this.listeners.delete(listener);}
+  private event(ok:boolean){const event={at:this.now(),ok};this.status.refreshEvents.push(event);this.status.refreshEvents=this.status.refreshEvents.slice(-100);for(const listener of this.listeners){try{listener(event);}catch{}}}
   async get():Promise<CopilotToken> {
     if(!this.token||this.token.refreshAt<=this.now()) {
       try{return await this.refresh();}catch(error){if(!this.token||this.token.expiresAt<=this.now())throw error;}
