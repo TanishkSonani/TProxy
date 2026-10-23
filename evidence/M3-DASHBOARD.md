@@ -4,7 +4,7 @@ Implemented five offline React/Vite views: Status, Usage, Live log, Limits and S
 
 Metrics use local SQLite WAL, including model/request/token/cache counts, latency percentiles, errors, hashed sessions, tool-call counts, local-date activity, refresh events and retention. Request body string values are replaced before insertion; outputs, credentials, image content and thinking signatures are not retained. Account quota and observed rate-limit headers are shown only when actually returned. Premium-request estimates remain N/A.
 
-Implementation deviation: `better-sqlite3` could not install on this Windows machine because its native build requires unavailable Visual C++ tools. This checkpoint uses Bun's built-in `bun:sqlite`, preserving SQLite WAL and avoiding a native addon/DLL dependency. The user was asked about this choice; it is provisional until a preference is supplied.
+Implementation deviation: `better-sqlite3` could not install on this Windows machine because its native build requires unavailable Visual C++ tools. This checkpoint uses Bun's built-in `bun:sqlite`, preserving SQLite WAL and avoiding a native addon/DLL dependency. The user explicitly approved Bun's built-in SQLite driver on 2026-10-23.
 
 Real Claude Code session `d4f59437-a1b2-46c7-98f8-cda59f8c0f65` returned BRIDGE_METRICS_READY through Auto with provider-reported usage. The live store contains this request. Automated checks cover restart persistence, WAL, redaction, aggregates, retention, local cookie authentication, Origin/Host rejection and protected management after API-key disabling.
 

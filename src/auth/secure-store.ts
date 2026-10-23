@@ -10,9 +10,11 @@ export async function powershell(script: string, input = ""): Promise<string> {
   const child = Bun.spawn(["powershell.exe","-NoProfile","-NonInteractive","-EncodedCommand",encoded],
     {stdin:"pipe",stdout:"pipe",stderr:"pipe",windowsHide:true});
   child.stdin.write(input); child.stdin.end();
-  const [out,,code] = await Promise.all([new Response(child.stdout).text(),new Response(child.stderr).text(),child.exited]);
-  if (code !== 0) throw new Error(`Windows protected credential operation failed (${code})`);
-  return out.trim();
+  const timer=setTimeout(()=>child.kill(),30000);
+  try{const [out,,code] = await Promise.all([new Response(child.stdout).text(),new Response(child.stderr).text(),child.exited]);
+    if (code !== 0) throw new Error(`Windows protected credential operation failed (${code})`);
+    return out.trim();
+  }finally{clearTimeout(timer);}
 }
 
 const credentialApi = `

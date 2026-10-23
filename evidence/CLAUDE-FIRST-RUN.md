@@ -29,3 +29,7 @@ Proposed UX: `ghcp-bridge claude [args...]` prepares first-run state and starts 
 - [Environment variables](https://code.claude.com/docs/en/env-vars): nonessential-traffic controls and env/settings precedence. The onboarding marker was verified through installed-code inspection and a local experiment, rather than presented as a documented public setting.
 
 Acceptance additions: fresh interactive profile, existing logged-in profile, conflicting API key/provider configuration, cold proxy, restart, supported CLI versions, no unexpected egress, and preservation of hooks/MCP/tool permissions. Repeat with the real bridge after M2.
+
+## M4 integration update
+
+The launcher is integrated into the compiled CLI. Fresh print and interactive profiles were tested against real Copilot Auto: no Anthropic login appeared, normal workspace trust was preserved, and the interactive response and /usage succeeded. Provider routing uses explicit --settings and child environment. Managed-settings conflict detection and complete process-level egress verification remain open; these results do not establish those guarantees. The normal user profile was not used for these tests.

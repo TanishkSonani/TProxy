@@ -19,3 +19,5 @@ Native Claude forwarding is covered by mock integration tests for tools, thinkin
 Claude Code treats the custom Auto ID as an unknown model and currently uses its safe 200k client window, while the selected upstream may support more. Its dollar figures are built-in estimates with unknown cost basis, **not observed Copilot charges**. The bridge will expose actual account quota separately; it must not invent premium billing.
 
 Startup/proxy/auth checks work from source; compiled distribution and dashboard are separate milestones. Mock/unit tests do not replace the remaining live acceptance gates. Thirty-day refresh coverage is simulation, not a completed wall-clock soak.
+
+Update at M4: native interactive /usage was verified after a real streamed reply through the Windows binary. It displayed nonzero model token/cache counts; dollar estimates remained explicitly marked uncertain. Cross-vendor switching is still unverified.
