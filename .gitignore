@@ -2,6 +2,8 @@
 evidence/private/
 node_modules/
 dist/
+release/
+codex-session-*.md
 *.sqlite*
 .env
 .env.*

@@ -73,7 +73,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
       try {
         const host=request.headers.get("host");if(![`127.0.0.1:${config.port}`,`localhost:${config.port}`].includes(host??""))throw new ApiError(403,"permission_error","Invalid local host");
         const origin=request.headers.get("origin");if(origin&&!([`http://127.0.0.1:${config.port}`,`http://localhost:${config.port}`].includes(origin)))throw new ApiError(403,"permission_error","Cross-origin requests are not allowed");
-        if(url.pathname==="/health"||url.pathname==="/api/hello")return Response.json({status:"ok",service:"ghcp-bridge"});
+        if(url.pathname==="/health"||url.pathname==="/api/hello")return Response.json({status:"ok",service:"tproxy"});
         if(request.method==="GET"&&(url.pathname==="/"||url.pathname.startsWith("/assets/"))){const response=await asset(url.pathname);if(response){
           response.headers.set("referrer-policy","no-referrer");
           response.headers.set("content-security-policy","default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'");
@@ -82,7 +82,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
         const cookie=request.headers.get("cookie")?.split(";").map(v=>v.trim()).find(v=>v.startsWith("ghcp_dashboard="))?.slice("ghcp_dashboard=".length)??"";
         const authenticated=equals(supplied,config.key)||equals(cookie,dashboardKey);
         if(url.pathname==="/api/session"&&request.method==="POST"){
-          if(!equals(supplied,dashboardKey)&&!equals(supplied,config.key))throw new ApiError(401,"authentication_error","Open an authenticated dashboard link from ghcp-bridge dashboard");
+          if(!equals(supplied,dashboardKey)&&!equals(supplied,config.key))throw new ApiError(401,"authentication_error","Open an authenticated dashboard link from tproxy dashboard");
           return Response.json({connected:true},{headers:{"cache-control":"no-store","set-cookie":`ghcp_dashboard=${dashboardKey}; HttpOnly; SameSite=Strict; Path=/`}});
         }
         if(!authenticated && (config.requireApiKey!==false||url.pathname.startsWith("/api/")))throw new ApiError(401,"authentication_error","Invalid local proxy credential");

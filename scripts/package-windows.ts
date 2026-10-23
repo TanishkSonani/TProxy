@@ -1,0 +1,14 @@
+import {mkdirSync,copyFileSync,writeFileSync,existsSync} from "node:fs";
+import {join,resolve} from "node:path";
+const root=resolve(import.meta.dir,".."),out=join(root,"dist/TProxy"),icons=join(out,"icons");
+const run=async(args:string[])=>{const p=Bun.spawn(args,{cwd:root,stdout:"inherit",stderr:"inherit",windowsHide:true});if(await p.exited!==0)throw new Error("Windows package command failed");};
+if(process.platform!=="win32")throw new Error("Desktop packaging requires Windows and its .NET Framework compiler");
+mkdirSync(icons,{recursive:true});
+await run(["python",join(root,"scripts/make-icons.py"),icons]);
+await run([process.execPath,"run","build"]);
+const compiler=join(process.env.WINDIR??"C:/Windows","Microsoft.NET/Framework64/v4.0.30319/csc.exe");if(!existsSync(compiler))throw new Error("The Windows .NET Framework compiler is unavailable");
+await run([compiler,"/nologo","/target:winexe","/optimize+","/platform:anycpu","/codepage:65001",`/out:${join(out,"tproxy-desktop.exe")}`,`/win32icon:${join(icons,"tproxy-off.ico")}`,"/r:System.dll","/r:System.Core.dll","/r:System.Drawing.dll","/r:System.Windows.Forms.dll","/r:System.Net.Http.dll","/r:System.Web.Extensions.dll","/r:Microsoft.CSharp.dll",join(root,"src/windows/DesktopController.cs")]);
+copyFileSync(join(root,"dist/tproxy-windows-x64.exe"),join(out,"tproxy.exe"));
+copyFileSync(join(root,"docs/windows/SETUP-INSTRUCTIONS.md"),join(out,"SETUP-INSTRUCTIONS.md"));
+writeFileSync(join(out,"Open-TProxy-Terminal.cmd"),'@echo off\r\nsetlocal\r\nset "PATH=%~dp0;%PATH%"\r\ncd /d "%USERPROFILE%"\r\ntitle TProxy Terminal\r\necho TProxy commands are available in this terminal only.\r\necho Use tproxy desktop, tproxy status, or tproxy claude.\r\n"%COMSPEC%" /d /k\r\nendlocal\r\n');
+console.log("Windows runtime package: "+out);

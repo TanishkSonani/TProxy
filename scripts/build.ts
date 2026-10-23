@@ -1,4 +1,4 @@
-import {mkdirSync,readdirSync,readFileSync,statSync,writeFileSync} from "node:fs";
+import {mkdirSync,readdirSync,readFileSync,statSync,writeFileSync,existsSync} from "node:fs";
 import {resolve,join} from "node:path";
 import {createHash} from "node:crypto";
 const root=resolve(import.meta.dir,".."),output=join(root,"dist"),web=join(output,"dashboard");
@@ -13,8 +13,9 @@ if(!result.success)throw new AggregateError(result.logs,"Bundling failed");
 const allowed=["bun-windows-x64","bun-darwin-arm64","bun-darwin-x64","bun-linux-x64","bun-linux-arm64"];
 const requested=process.argv.slice(2),targets=requested.includes("--all")?allowed:requested.length?requested:[`bun-${process.platform==="win32"?"windows":process.platform}-${process.arch}`];
 const checksums:string[]=[];
-for(const target of targets){if(!allowed.includes(target))throw new Error("Unsupported compile target");const suffix=target.slice(4),name=`ghcp-bridge-${suffix}${suffix.startsWith("windows")?".exe":""}`,file=join(output,name);
-  await run([process.execPath,"build",join(output,"staging/cli.js"),"--compile",`--target=${target}`,`--outfile=${file}`,"--no-compile-autoload-dotenv","--no-compile-autoload-bunfig","--no-compile-autoload-tsconfig","--no-compile-autoload-package-json"]);
+for(const target of targets){if(!allowed.includes(target))throw new Error("Unsupported compile target");const suffix=target.slice(4),name=`tproxy-${suffix}${suffix.startsWith("windows")?".exe":""}`,file=join(output,name);
+  const icon=join(output,"TProxy/icons/tproxy-off.ico"),branding=target.includes("windows")?["--windows-title=TProxy","--windows-description=TProxy local Copilot gateway","--windows-version=0.2.0.0",...(existsSync(icon)?[`--windows-icon=${icon}`]:[])]:[];
+  await run([process.execPath,"build",join(output,"staging/cli.js"),"--compile",`--target=${target}`,`--outfile=${file}`,"--no-compile-autoload-dotenv","--no-compile-autoload-bunfig","--no-compile-autoload-tsconfig","--no-compile-autoload-package-json",...branding]);
   checksums.push(`${createHash("sha256").update(readFileSync(file)).digest("hex")}  ${name}`);console.log(`${name}: ${Math.round(statSync(file).size/1024/1024)} MiB`);
 }
 writeFileSync(join(output,"SHA256SUMS.txt"),checksums.join("\n")+"\n");

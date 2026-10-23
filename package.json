@@ -1,6 +1,6 @@
 {
-  "name": "ghcp-claude-bridge",
-  "version": "0.0.0",
+  "name": "tproxy",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "build:ui": "vite build --config dashboard/vite.config.ts",
     "build": "bun scripts/build.ts",
     "build:all": "bun scripts/build.ts --all",
+    "package:windows": "bun scripts/package-windows.ts",
     "research:test-redaction": "python -m unittest discover -s scripts -p \"test_*.py\"",
     "research:discover": "bun scripts/discover-copilot.ts",
     "research:preflight": "bun scripts/preflight.ts",

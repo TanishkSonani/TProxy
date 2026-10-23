@@ -84,8 +84,8 @@ export class FileSecretStore implements SecretStore {
 export class WindowsProtectedStore implements SecretStore {
   kind="windows-vault/dpapi-fallback";
   private vault:WindowsCredentialStore;private file:string;
-  constructor(private directory:string,target:string){this.vault=new WindowsCredentialStore(target);this.file=join(directory,"credentials.dpapi");}
-  async read(){if(existsSync(this.file))return (await windowsUnprotect(readFileSync(this.file))).toString("utf8");return this.vault.read();}
+  constructor(private directory:string,target:string,private legacyTarget?:string){this.vault=new WindowsCredentialStore(target);this.file=join(directory,"credentials.dpapi");}
+  async read(){if(existsSync(this.file))return (await windowsUnprotect(readFileSync(this.file))).toString("utf8");const value=await this.vault.read();if(value!==null||!this.legacyTarget)return value;const legacy=await new WindowsCredentialStore(this.legacyTarget).read();if(legacy!==null)await this.write(legacy);return legacy;}
   async write(value:string){
     if(Buffer.byteLength(value)<=5120){await this.vault.write(value);if(existsSync(this.file))unlinkSync(this.file);return;}
     const encoded=await powershell(`Add-Type -AssemblyName System.Security
@@ -99,7 +99,7 @@ $cipher=[Security.Cryptography.ProtectedData]::Protect($value,$null,[Security.Cr
 
 export function secretStore(directory: string): SecretStore {
   const profile=createHash("sha256").update(directory).digest("hex").slice(0,24);
-  if(process.platform==="win32") return new WindowsProtectedStore(directory,`ghcp-bridge:${profile}`);
+  if(process.platform==="win32") return new WindowsProtectedStore(directory,`tproxy:${profile}`,`ghcp-bridge:${profile}`);
   // Protected file is the explicitly supported fallback when an OS vault adapter is unavailable.
   return new FileSecretStore(directory);
 }

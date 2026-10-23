@@ -9,27 +9,29 @@ Current acceptance scope is Windows + Copilot Free + Auto; native Claude entitle
 ## Run on Windows
 
 ```powershell
-.\dist\ghcp-bridge-windows-x64.exe start
+.\tproxy.exe start
 ```
 
-Open the private dashboard link printed by `start`. To get a link again, run `ghcp-bridge-windows-x64.exe dashboard`. Opening the bare localhost URL shows an access screen; it does not grant management access. In another terminal:
+The installed Windows utility is `%LOCALAPPDATA%\Programs\TProxy`. Double-click the TProxy desktop shortcut for Start/Stop controls. Green/grey icons track ON/OFF while the per-user monitor runs, including CLI starts/stops. See [step-by-step Windows setup](docs/windows/SETUP-INSTRUCTIONS.md).
+
+Open the private dashboard link printed by `start`. To get a link again, run `tproxy.exe dashboard`. Opening the bare localhost URL shows an access screen; it does not grant management access. In another terminal:
 
 ```powershell
-.\dist\ghcp-bridge-windows-x64.exe claude
+.\tproxy.exe claude
 ```
 
 The launcher reuses the installed `claude`, prepares first-run onboarding and supplies the local proxy credential. It preserves normal Claude storage, hooks, local MCP and tool permissions. A new workspace can still ask for normal trust. Use the launcher for first-run setup; starting the proxy alone cannot change another terminal's environment.
 
 ```powershell
-.\dist\ghcp-bridge-windows-x64.exe status
-.\dist\ghcp-bridge-windows-x64.exe dashboard
-.\dist\ghcp-bridge-windows-x64.exe stop
-.\dist\ghcp-bridge-windows-x64.exe auth
-.\dist\ghcp-bridge-windows-x64.exe env
-.\dist\ghcp-bridge-windows-x64.exe claude -- --model copilot-auto
+.\tproxy.exe status
+.\tproxy.exe dashboard
+.\tproxy.exe stop
+.\tproxy.exe auth
+.\tproxy.exe env
+.\tproxy.exe claude -- --model copilot-auto
 ```
 
-`start` runs in the foreground. `claude` can start an owned proxy and stop it when Claude exits or setup fails. There is no tray or autostart service. Commands accept `--port N`, `--config FILE` and `--data-dir DIR`. Default Windows storage is `%LOCALAPPDATA%\ghcp-bridge`; credentials use Windows Credential Manager, with a CurrentUser-DPAPI encrypted-file fallback for records beyond the vault's size limit. Retention defaults to 90 days. A small runtime file tracks the active port when a saved port change is pending. Keep custom data directories private; launcher settings there include the local proxy key.
+`start` runs in the foreground. `claude` can start an owned proxy and stop it when Claude exits or setup fails. The Windows controller provides a tray status monitor and per-user login shortcut; it does not automatically start the proxy. Commands accept `--port N`, `--config FILE` and `--data-dir DIR`. Default Windows storage is `%LOCALAPPDATA%\TProxy`; credentials use Windows Credential Manager, with a CurrentUser-DPAPI encrypted-file fallback for records beyond the vault's size limit. Retention defaults to 90 days. A small runtime file tracks the active port when a saved port change is pending. Keep custom data directories private; launcher settings there include the local proxy key.
 
 `env` prints shell settings, including a secret local proxy key. Keep that output out of logs/source control. It sets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL` and model slots, and clears conflicting API-key/OAuth/provider variables. Environment setup alone can still show first-run onboarding. A complete audit that Claude makes no Anthropic/background connections remains pending.
 
@@ -76,7 +78,10 @@ bun test
 bun run typecheck
 bun run build
 bun run build:all
+bun run package:windows
 ```
+
+`package:windows` produces the six-file portable Windows package under `dist/TProxy`; copy that folder to `%LOCALAPPDATA%\Programs\TProxy` and run `tproxy setup`.
 
 `build` creates the host executable. `build:all` creates Windows x64, macOS arm64/x64 and Linux arm64/x64 executables plus checksums under `dist/`. UI and license notices are embedded; binaries need no Bun installation or asset folder. Only Windows has been runtime tested; other targets still need platform testing. See [packaging evidence](evidence/M4-PACKAGING.md).
 
@@ -92,8 +97,10 @@ For source execution, run `bun run build:ui`, then `bun run start` and `bun run 
 - Claude's dollar figures for custom model IDs are estimates with unknown cost basis, not Copilot charges. Interactive `/usage` displays real token counts; cross-vendor `/model` still needs an entitled account.
 - Refresh coverage simulates 35 days; it is not a completed soak. Visual browser QA and a complete process-level egress audit remain pending. Managed corporate settings can prevent provider redirection.
 
-Reuse is tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); `ghcp-bridge licenses` prints bundled notices.
+Reuse is tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); `tproxy licenses` prints bundled notices.
 
 The [real-world hardening review](evidence/REAL-WORLD-REVIEW.md) compares pinned reference implementations, lists regression coverage and separates remaining limitations from completed fixes. Local managed settings and extra `--settings` files are checked for routing conflicts before Claude starts; policies are never edited. Dynamic policy helpers require administrator verification rather than being bypassed. This is a conservative preflight, not a complete policy-engine replacement.
 
 Unsupported by GitHub. Use may violate Copilot terms and corporate policy, may be audit-logged, and may risk seat enforcement. Keep usage interactive and low-volume. Account entitlements and organization policy are never bypassed.
+
+Generated binaries, dependencies and disposable private captures have been moved into `%LOCALAPPDATA%\TProxy\development-archive` for reversible cleanup. Research-cache cleanup is partial: automatic review blocked permanent deletion, and Windows denied moving a cached repository's `.git` directory. Source, tests, pinned reference metadata, licenses and sanitized evidence are retained so the utility remains maintainable. Run `bun install --frozen-lockfile` before rebuilding. The six-file desktop runtime has no dependency on this source checkout. Archiving does not free disk space.

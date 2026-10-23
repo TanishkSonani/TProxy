@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import type { AuthOptions } from "./auth/providers";
 export type Config = {port:number;dataDir:string;models:Record<string,string>;retentionDays:number;requireApiKey:boolean;contextWindowTokens?:number;contextFallbackTokens:number;auth:AuthOptions};
 export function loadConfig(path?:string,dataDir?:string):Config {
-  const root=resolve(dataDir??process.env.GHCP_BRIDGE_DATA_DIR??join(process.env.LOCALAPPDATA??join(homedir(),".local/share"),"ghcp-bridge"));
+  const root=resolve(dataDir??process.env.TPROXY_DATA_DIR??process.env.GHCP_BRIDGE_DATA_DIR??join(process.env.LOCALAPPDATA??join(homedir(),".local/share"),"TProxy"));
   const file=path??join(root,"config.json");const input=existsSync(file)?JSON.parse(readFileSync(file,"utf8").replace(/^\uFEFF/,"")):{};
   if(!input||typeof input!=="object"||Array.isArray(input))throw new Error("Bridge configuration must be a JSON object");
   if(input.models!==undefined&&(!input.models||typeof input.models!=="object"||Array.isArray(input.models)||Object.values(input.models).some(v=>typeof v!=="string"||!v.trim())))throw new Error("Model mappings must contain non-empty model IDs");
