@@ -85,6 +85,11 @@
           "path": "src/start.ts",
           "sha256": "cb6d98f287891edaae1152c0f9e2057e5e04c17fd23ea5f9b3f979ef39d5415e",
           "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/start.ts"
+        },
+        {
+          "path": "src/lib/shell.ts",
+          "sha256": "f0a3ad775aea3937a1a23ef4ad9ae019c9a893f87172ba4f688b0c41135855a5",
+          "url": "https://github.com/ericc-ch/copilot-api/blob/0ea08febdd7e3e055b03dd298bf57e669500b5c1/src/lib/shell.ts"
         }
       ]
     },

@@ -121,3 +121,5 @@ The pinned messense listener supersedes the older cached web view showing 0.0.0.
 - Separate paid individual, business and enterprise/EMU account captures.
 - Implemented auth/proxy/dashboard/packaging; restart, refresh/revocation and 30+ day soak evidence.
 - Actual Claude Code multi-turn/tool/subagent/model-switch/usage and forced auto-compaction acceptance. No working bridge/dashboard exists yet.
+
+Additional startup requirement: first-run CLI must use the local provider without Anthropic auth setup. Startup helpers and a local-stub interactive experiment on Claude Code 2.1.269 are recorded in [CLAUDE-FIRST-RUN.md](evidence/CLAUDE-FIRST-RUN.md); real-bridge integration and egress verification remain pending. Reused source components and licenses are tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

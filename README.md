@@ -27,4 +27,6 @@ Build order: M0 protocol verification → M1 existing-session auth → M2 native
 
 Architecture target: one Bun/TypeScript process bound to 127.0.0.1:4141; native `/v1/messages` forwarding for Claude models, and protocol adapters for other account-enabled models; local SQLite WAL metrics; embedded offline React/Vite UI; OS-protected credentials. Claude model traffic never uses OpenAI translation. Conversation truncation stays with Claude Code. See [model routing requirements](evidence/MODEL-ROUTING.md); adapters are planned, not implemented or validated yet.
 
+First-use requirement: the launcher prepares local provider credentials and onboarding so Claude Code needs no Anthropic sign-in. Startup helpers and a fresh interactive test against a localhost stub are in place; they are not yet integrated into a finished launcher. See [first-run findings](evidence/CLAUDE-FIRST-RUN.md). Code reuse is tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 Unsupported by GitHub. Use may violate Copilot terms and corporate policy, may be audit-logged, and may risk seat enforcement. Keep usage interactive and low-volume. The bridge must never bypass account entitlements or fabricate quota/model availability.

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { discoverCopilot, discoveryArgs } from "./discover-copilot";
+import { discoverCopilot, discoveryArgs } from "../scripts/discover-copilot";
 
 const temporary: string[] = [];
 function fixture() { const root = mkdtempSync(join(tmpdir(), "bridge-discovery-")); temporary.push(root); return root; }
