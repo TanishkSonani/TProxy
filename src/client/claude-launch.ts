@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
+import {DEFAULT_CONTEXT_WINDOW} from "./context-window";
 
-export type ClaudeConnection = { port: number; key: string; model: string; smallModel: string;sonnetModel?:string;opusModel?:string };
+export type ClaudeConnection = { port: number; key: string; model: string; smallModel: string;sonnetModel?:string;opusModel?:string;contextWindowTokens?:number };
 
 // Return a child environment; never mutate the caller's shell or saved credentials.
 export function claudeEnvironment(connection: ClaudeConnection,
@@ -12,6 +13,8 @@ export function claudeEnvironment(connection: ClaudeConnection,
   if (![connection.key, connection.model, connection.smallModel].every(value => value.trim().length > 0))
     throw new Error("Proxy credential and model mappings must be ready before starting Claude Code");
   const env = { ...inherited };
+  const window=connection.contextWindowTokens??DEFAULT_CONTEXT_WINDOW;
+  if(!Number.isInteger(window)||window<1000||window>1000000)throw new Error("Invalid client context window");
   const conflicts = new Set(["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
     "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR", "ANTHROPIC_UNIX_SOCKET", "ANTHROPIC_CUSTOM_HEADERS",
     "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_ANTHROPIC_AWS",
@@ -24,6 +27,11 @@ export function claudeEnvironment(connection: ClaudeConnection,
     ANTHROPIC_DEFAULT_HAIKU_MODEL: connection.smallModel,
     ANTHROPIC_DEFAULT_SONNET_MODEL: connection.sonnetModel??connection.model,
     ANTHROPIC_DEFAULT_OPUS_MODEL: connection.opusModel??connection.model,
+    CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(window),
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(Math.max(100000,window)),
+    CLAUDE_CODE_DISABLE_1M_CONTEXT: "1",
+    CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT: "",
+    DISABLE_COMPACT: "", DISABLE_AUTO_COMPACT: "",
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_AUTOUPDATER: "1",
     CLAUDE_CODE_ENABLE_TELEMETRY: "0", OTEL_SDK_DISABLED: "true",

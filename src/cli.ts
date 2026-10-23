@@ -32,13 +32,14 @@ try {
   const runtimeFile=join(config.dataDir,"runtime.json");let activePort=config.port;
   if(command!=="start"&&port===undefined&&existsSync(runtimeFile)){try{const runtime=JSON.parse(readFileSync(runtimeFile,"utf8"));process.kill(runtime.pid,0);if(Number.isInteger(runtime.port)&&runtime.port>=1&&runtime.port<=65535)activePort=runtime.port;}catch{}}
   const keyStore=secretStore(join(config.dataDir,"local-api-key"));let key=await keyStore.read();if(!key){key=randomBytes(32).toString("hex");await keyStore.write(key);}
-  const connection={port:activePort,key,model:config.models.default,smallModel:config.models.haiku,sonnetModel:config.models.sonnet,opusModel:config.models.opus};
+  const connection={port:activePort,key,model:config.models.default,smallModel:config.models.haiku,sonnetModel:config.models.sonnet,opusModel:config.models.opus,contextWindowTokens:config.contextWindowTokens};
   const url=`http://127.0.0.1:${activePort}`;
   const localRequest=(path:string,method="GET")=>fetch(url+path,{method,headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(3000)});
   if(command==="status"||command==="stop"){
     const response=await localRequest(command==="status"?"/api/status":"/api/stop",command==="status"?"GET":"POST");
     if(!response.ok)throw new Error(`Bridge control request failed (${response.status})`);console.log(JSON.stringify(await response.json(),null,2));
   } else if(command==="env") {
+    try{const response=await localRequest("/api/status");if(response.ok){const status=await response.json() as any;if(Number.isInteger(status.contextWindowTokens))connection.contextWindowTokens=Math.min(config.contextWindowTokens,status.contextWindowTokens);}}catch{}
     const env=claudeEnvironment(connection,{});env.ANTHROPIC_API_KEY=undefined;env.CLAUDE_CODE_OAUTH_TOKEN=undefined;
     console.log(generateEnvScript(env,process.platform==="win32"?"powershell":"bash"));
   } else {
@@ -71,7 +72,8 @@ try {
         if(!quiet)console.log("Launch with: ghcp-bridge claude\nCopy shell settings with: ghcp-bridge env");
         process.on("SIGINT",()=>{proxy?.stop();process.exit(0);});process.on("SIGTERM",()=>{proxy?.stop();process.exit(0);});
       } else {
-        const ready=await localRequest("/api/status");if(!ready.ok||!(await ready.json() as any).auth?.source){proxy?.stop();throw new Error(`Connect GitHub at ${url} before launching Claude Code`);}
+        const ready=await localRequest("/api/status"),status=ready.ok?await ready.json() as any:null;if(!status?.auth?.source){proxy?.stop();throw new Error(`Connect GitHub at ${url} before launching Claude Code`);}
+        if(Number.isInteger(status.contextWindowTokens))connection.contextWindowTokens=Math.min(config.contextWindowTokens,status.contextWindowTokens);
         const binary=Bun.which("claude");if(!binary)throw new Error("Claude Code is not installed or not on PATH");
         const configDir=claudeConfig??process.env.CLAUDE_CONFIG_DIR;const onboarding=configDir?join(configDir,".claude.json"):join(homedir(),".claude.json");
         prepareClaudeOnboarding(onboarding);const env=claudeEnvironment(connection);if(configDir)env.CLAUDE_CONFIG_DIR=configDir;

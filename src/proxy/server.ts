@@ -11,8 +11,9 @@ import { claudeEnvironment } from "../client/claude-launch";
 import { generateEnvScript } from "../client/env-script";
 import { DeviceFlow } from "../auth/device-flow";
 import {stopSequences} from "./stop-sequences";
+import {clientContextWindow} from "../client/context-window";
 
-export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number};
+export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number;contextWindowTokens?:number};
 export type RequestRecord={id:string;at:number;model:string;status:number;latency:number;input:number;output:number;tools:number;session:string;estimated?:boolean;body?:unknown;cacheRead?:number;cacheWrite?:number};
 type AutoSelection={model:any;token:string;expires:number};
 export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{client?:CopilotClient;record?:(row:RequestRecord)=>void;onStop?:()=>void;metrics?:MetricsStore;saveSettings?:(settings:{port:number;models:Record<string,string>;retentionDays:number;requireApiKey:boolean})=>void}={}) {
@@ -21,6 +22,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
   try{catalog=await auth.models();}catch(error){if(!(error instanceof Error)||!error.message.startsWith("AUTH_REQUIRED"))throw error;catalog={data:[]};}
   let modelMap=new Map<string,any>((catalog.data??[]).map((m:any)=>[m.id,m]));
   const selections=new Map<string,AutoSelection>(),selectionInflight=new Map<string,Promise<AutoSelection>>();
+  const contextWindow=()=>clientContextWindow(modelMap.values(),config.models,config.contextWindowTokens,[...selections.values()].map(s=>s.model));
   const dashboardKey=randomUUID()+randomUUID(),booted=Date.now();
   let pendingPort=config.port,metricsError=false;
   let deviceState:any=null,deviceAbort:AbortController|undefined;
@@ -67,7 +69,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
         if(!authenticated && (config.requireApiKey!==false||url.pathname.startsWith("/api/")))throw new ApiError(401,"authentication_error","Invalid local proxy credential");
         if(url.pathname.startsWith("/api/")){
           const json=(value:any)=>Response.json(value,{headers:{"cache-control":"no-store"}});
-          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,auth:auth.status,device:deviceState,limits:client.observedLimits,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
+          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:contextWindow(),auth:auth.status,device:deviceState,limits:client.observedLimits,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
           if(url.pathname==="/api/summary")return json(options.metrics?.summary()??null);
           if(url.pathname==="/api/logs")return json({requests:options.metrics?.recent()??[],events:options.metrics?.events()??[]});
           if(url.pathname==="/api/catalog")return json([...modelMap.values()].map(m=>({id:m.id,name:m.name,vendor:m.vendor,policy:m.policy,picker:m.model_picker_enabled,endpoints:m.supported_endpoints})));
@@ -82,7 +84,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
           }
           if(url.pathname==="/api/env"){
             const shell=url.searchParams.get("shell")??"powershell";if(!["powershell","bash","cmd"].includes(shell))throw new ApiError(400,"invalid_request_error","Unknown shell");
-            const env=claudeEnvironment({port:config.port,key:config.key,model:config.models.default,smallModel:config.models.haiku,sonnetModel:config.models.sonnet,opusModel:config.models.opus},{});env.ANTHROPIC_API_KEY=undefined;env.CLAUDE_CODE_OAUTH_TOKEN=undefined;
+            const env=claudeEnvironment({port:config.port,key:config.key,model:config.models.default,smallModel:config.models.haiku,sonnetModel:config.models.sonnet,opusModel:config.models.opus,contextWindowTokens:contextWindow()},{});env.ANTHROPIC_API_KEY=undefined;env.CLAUDE_CODE_OAUTH_TOKEN=undefined;
             return json({script:generateEnvScript(env,shell as "powershell"|"bash"|"cmd")});
           }
           if(url.pathname==="/api/settings"){
