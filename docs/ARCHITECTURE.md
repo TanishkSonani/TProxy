@@ -1,6 +1,6 @@
 # TProxy architecture
 
-Revision: 2026-10-24
+Revision: 2026-10-24 (v1.0.1)
 Scope: the local desktop gateway, its outbound trust and routing boundaries, and the Windows deployment model.
 Status: architecture baseline with an implementation-status map. Working-tree changes are not evidence that an installed or published binary has been updated.
 
@@ -251,6 +251,10 @@ Running a stray controller copy from the Desktop must not redirect icon lookup t
 Updates replace package files only after their owning processes are stopped. Validation can use a separate data directory and unused loopback port. A build, documentation edit or test run must not require restarting an existing user session.
 
 ## 12. Failure behavior
+
+Limits uses a dedicated authenticated quota-refresh path. Visiting the page, returning to a visible tab, or the 30-second visible-page timer requests account data without restarting authentication or refreshing the model catalog. The server coalesces concurrent checks and caches successful quota responses for at least 15 seconds. Failures retain the last successful values, use bounded exponential backoff, and honor longer Retry-After values. Hidden pages and other views do not schedule quota checks.
+
+Quota checks do not generate model traffic to obtain rate-limit headers. Those headers and their observation timestamp change only when an upstream model response supplies them. A quota timestamp advances only when GitHub returns a valid quota snapshot.
 
 | Failure | Required behavior |
 | --- | --- |

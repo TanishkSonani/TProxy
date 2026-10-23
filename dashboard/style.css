@@ -251,6 +251,8 @@ table caption {text-align:left;color:#aaa0b7;padding:10px;font-size:12px}
 .info-strip p {font-size:12px;flex:1}
 .info-strip button {flex-shrink:0;background:#292133;font-size:12px}
 .quota-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.quota-sync {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:-8px 0 20px;color:var(--muted);font-size:12px;line-height:1.7}
+.quota-sync>span:last-child {flex:1;min-width:200px}
 .quota-card {padding:17px;border:1px solid #3b3046;border-radius:9px;background:linear-gradient(135deg,#211b2a,#19161f)}
 .quota-card>div {display:flex;align-items:center;gap:8px}
 .quota-card h3 {text-transform:capitalize;font-size:12px;font-weight:500;color:#bfb0ce}

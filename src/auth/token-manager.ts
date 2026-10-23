@@ -5,7 +5,9 @@ export type CopilotToken = { token: string; api: string; expiresAt: number; refr
 type Cache = { version:1; credential:Credential; copilot:CopilotToken };
 export class CredentialRejected extends Error {constructor(readonly status:number){super("GitHub credential was rejected; reconnect GitHub");}}
 export type AuthStatus = { source?:string; login?:string; host?:string; api?:string; expiresAt?:number;
-  refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; quotaUpdatedAt?:number; refreshEvents:{at:number;ok:boolean}[] };
+  refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; quotaUpdatedAt?:number;
+  quotaRefresh?:{state:"refreshing"|"ready"|"error";attemptedAt:number;nextAttemptAt?:number;message?:string};
+  refreshEvents:{at:number;ok:boolean}[] };
 export function copilotOrigin(value: unknown): string {
   if(typeof value!=="string")throw new Error("Token exchange did not return endpoints.api");
   const url=new URL(value);
@@ -18,6 +20,7 @@ export function copilotOrigin(value: unknown): string {
 export class TokenManager {
   private credential?:Credential;private token?:CopilotToken;private inflight?:Promise<CopilotToken>;private timer?:ReturnType<typeof setTimeout>;
   private stopped=false;
+  private quotaInflight?:Promise<AuthStatus>;private quotaFailures=0;
   private listeners=new Set<(event:{at:number;ok:boolean})=>void>();
   status:AuthStatus;
   constructor(private store:SecretStore, private options:AuthOptions={}, private deps:{fetch?:typeof fetch;now?:()=>number;provider?:(options:AuthOptions)=>Promise<Credential|null>;background?:boolean}={}) {
@@ -102,8 +105,40 @@ export class TokenManager {
     const responses=await Promise.allSettled([this.request(base+"/user",this.credential.token,true),this.request(base+"/copilot_internal/user",this.credential.token,true)]);
     for(let i=0;i<responses.length;i++){const result=responses[i];if(result.status!=="fulfilled"||!result.value.ok)continue;
       try {const data=await result.value.json() as any;if(i===0)this.status.login=data.login;
-        else Object.assign(this.status,{plan:data.copilot_plan,sku:data.access_type_sku,organizations:data.organization_login_list,quota:data.quota_snapshots,quotaUpdatedAt:this.now()});}catch{}
+        else this.applyQuota(data);}catch{}
     }
+  }
+  private applyQuota(data:any){
+    if(!data?.quota_snapshots||typeof data.quota_snapshots!=="object"||Array.isArray(data.quota_snapshots))return false;
+    for(const [field,key]of [["plan","copilot_plan"],["sku","access_type_sku"],["organizations","organization_login_list"]] as const)if(data[key]!==undefined)(this.status as any)[field]=data[key];
+    const at=this.now();this.status.quota=data.quota_snapshots;this.status.quotaUpdatedAt=at;
+    this.status.quotaRefresh={state:"ready",attemptedAt:at,nextAttemptAt:at+15000};this.quotaFailures=0;return true;
+  }
+  async refreshQuota():Promise<AuthStatus>{
+    if(this.quotaInflight)return this.quotaInflight;
+    if((this.status.quotaRefresh?.nextAttemptAt??0)>this.now())return this.status;
+    this.quotaInflight=(async()=>{
+      const at=this.now();let retryAfter:string|null=null,message="Account quota could not be refreshed. Last received data is retained.";
+      this.status.quotaRefresh={state:"refreshing",attemptedAt:at};
+      try{
+        if(!this.credential){message="Connect a GitHub account to retrieve quota data.";throw new Error("No credential");}
+        const response=await this.request(githubApi(this.credential.host)+"/copilot_internal/user",this.credential.token,true);
+        retryAfter=response.headers.get("retry-after");
+        if(!response.ok){
+          if(response.status===429)message="GitHub rate-limited quota refresh. Automatic retry will wait.";
+          else if([401,403].includes(response.status))message="GitHub denied quota access for the selected account. Model authentication was not changed by this check.";
+          await response.body?.cancel();throw new Error("Quota request rejected");
+        }
+        if(!this.applyQuota(await response.json())){message="GitHub did not return quota data. Last received data is retained.";throw new Error("Missing quota");}
+      }catch{
+        const failedAt=this.now(),backoff=Math.min(300000,30000*2**Math.min(this.quotaFailures++,4));
+        let delay=retryAfter!==null?Number(retryAfter)*1000:NaN;
+        if(!Number.isFinite(delay)&&retryAfter)delay=Date.parse(retryAfter)-failedAt;
+        this.status.quotaRefresh={state:"error",attemptedAt:at,message,nextAttemptAt:failedAt+Math.min(8640000000000000-failedAt,Math.max(backoff,Number.isFinite(delay)?delay:0))};
+      }
+      return this.status;
+    })();
+    try{return await this.quotaInflight;}finally{this.quotaInflight=undefined;}
   }
   async models(){const token=await this.get();const response=await this.request(token.api+"/models",token.token,false);if(!response.ok)throw new Error(`Model discovery failed (${response.status})`);return response.json() as Promise<any>;}
   stop(){this.stopped=true;clearTimeout(this.timer);}

@@ -134,6 +134,10 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
             return url.pathname==="/api/summary"?json(options.metrics?.summary(90,Date.now(),filter)??null):url.pathname==="/api/activity"?json(options.metrics?.summary(365,Date.now(),filter)??null):json({requests:options.metrics?.recent(200,0,filter)??[],events:options.metrics?.events()??[],limit:200});
           }
           if(url.pathname==="/api/catalog")return json([...modelMap.values()].map(m=>({id:m.id,name:m.name,vendor:m.vendor,policy:m.policy,picker:m.model_picker_enabled,endpoints:m.supported_endpoints,limits:m.capabilities?.limits})));
+          if(url.pathname==="/api/quota"&&request.method==="POST"){
+            if(typeof auth.refreshQuota!=="function")throw new ApiError(503,"api_error","Account quota refresh is unavailable");
+            await startup;return json(await auth.refreshQuota());
+          }
           if(url.pathname==="/api/refresh"&&request.method==="POST"){
             try{
               if(typeof (auth as any).initialize==="function"){authStartup={state:"starting"};await auth.initialize();authStartup={state:auth.status.source?"ready":"needs_auth"};}

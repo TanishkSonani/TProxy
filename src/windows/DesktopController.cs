@@ -13,7 +13,7 @@ using System.Security.Cryptography;
 using System.Text;
 [assembly: System.Reflection.AssemblyTitle("TProxy Desktop")]
 [assembly: System.Reflection.AssemblyProduct("TProxy")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.1.0")]
 
 internal static class Paths {
     internal static readonly string Root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "TProxy");

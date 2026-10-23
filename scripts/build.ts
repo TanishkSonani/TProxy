@@ -15,7 +15,7 @@ const allowed=["bun-windows-x64","bun-darwin-arm64","bun-darwin-x64","bun-linux-
 const requested=process.argv.slice(2),targets=requested.includes("--all")?allowed:requested.length?requested:[`bun-${process.platform==="win32"?"windows":process.platform}-${process.arch}`];
 const checksums:string[]=[];
 for(const target of targets){if(!allowed.includes(target))throw new Error("Unsupported compile target");const suffix=target.slice(4),name=`tproxy-${suffix}${suffix.startsWith("windows")?".exe":""}`,file=join(output,name);
-  const icon=join(output,"TProxy/icons/tproxy-off.ico"),branding=target.includes("windows")?["--windows-title=TProxy","--windows-description=TProxy local Copilot gateway","--windows-version=1.0.0.0",...(existsSync(icon)?[`--windows-icon=${icon}`]:[])]:[];
+  const icon=join(output,"TProxy/icons/tproxy-off.ico"),branding=target.includes("windows")?["--windows-title=TProxy","--windows-description=TProxy local Copilot gateway","--windows-version=1.0.1.0",...(existsSync(icon)?[`--windows-icon=${icon}`]:[])]:[];
   await run([process.execPath,"build",join(output,"staging/cli.js"),"--compile","--compile-exec-argv=--use-system-ca",`--target=${target}`,`--outfile=${file}`,"--no-compile-autoload-dotenv","--no-compile-autoload-bunfig","--no-compile-autoload-tsconfig","--no-compile-autoload-package-json",...branding]);
   checksums.push(`${createHash("sha256").update(readFileSync(file)).digest("hex")}  ${name}`);console.log(`${name}: ${Math.round(statSync(file).size/1024/1024)} MiB`);
 }

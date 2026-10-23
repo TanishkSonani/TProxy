@@ -1,6 +1,6 @@
 # TProxy
 
-Current version: **1.0.0**, the environment-trust architecture release. Compatibility remains a preview within the tested scope below.
+Current version: **1.0.1**, the environment-trust architecture release. Compatibility remains a preview within the tested scope below.
 
 A local gateway that connects your installed Claude Code CLI to models available through your GitHub Copilot account. Claude models use Copilot's native Messages endpoint; other models use Responses or Chat Completions adapters. An offline dashboard stores usage in local SQLite.
 
@@ -47,6 +47,7 @@ See the [step-by-step Windows guide](docs/windows/SETUP-INSTRUCTIONS.md) for ins
 - Metadata-driven context windows and Anthropic-format overflow errors; no usage multipliers or automatic history truncation.
 - Local React dashboard: status, usage heatmap, latency, request explorer, observed limits and settings. Explore dates, models and outcomes; pause live logs without stopping the proxy.
 - Secret previews are masked until revealed. Copy actions identify credentials, and disabling the proxy API key requires confirmation.
+- Limits automatically checks account quotas on entry, every 30 seconds while visible, and when the tab regains focus. Concurrent checks are coalesced, failures back off, and provider Retry-After is respected. Rate-limit headers update from actual model responses; timestamps distinguish newly received data from cached values.
 - Windows desktop controls and status monitor; single executable CLI builds for other platforms.
 
 The launcher supplies the local provider settings and prepares first-run onboarding. Normal Claude storage, hooks, MCP and tool permissions remain in use; workspace trust and corporate policy still apply.

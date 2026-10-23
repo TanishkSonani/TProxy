@@ -1,4 +1,25 @@
 import {test,expect} from "@playwright/test";
++
+test("quotas refresh on entry, every 30 seconds and on return, with hidden-page polling paused",async({page})=>{
+  await page.clock.install({time:new Date()});
+  const calls=await fixture(page),count=()=>calls.filter(c=>new URL(c.url).pathname==="/api/quota").length;
+  expect(count()).toBe(0);
+  await page.getByRole("button",{name:"Limits",exact:true}).click();
+  await expect.poll(count).toBe(1);
+  await expect(page.getByText("Auto refresh / 30s",{exact:true})).toBeVisible();
+  const observed=await page.getByRole("heading",{name:"Rate-limit headers",exact:true}).locator("..").locator("p").textContent();
+  await page.clock.fastForward(31000);await expect.poll(count).toBe(2);
+  expect(await page.getByRole("heading",{name:"Rate-limit headers",exact:true}).locator("..").locator("p").textContent()).toBe(observed);
+  await page.evaluate(()=>{Object.defineProperty(document,"visibilityState",{configurable:true,get:()=>"hidden"});document.dispatchEvent(new Event("visibilitychange"));});
+  await page.clock.fastForward(60000);expect(count()).toBe(2);
+  await page.evaluate(()=>{Object.defineProperty(document,"visibilityState",{configurable:true,get:()=>"visible"});document.dispatchEvent(new Event("visibilitychange"));});
+  await expect.poll(count).toBe(3);
+  await page.getByRole("button",{name:"Overview",exact:true}).click();
+  await page.clock.fastForward(60000);expect(count()).toBe(3);
+  await page.getByRole("button",{name:"Limits",exact:true}).click();
+  await expect.poll(count).toBe(4);
+});
+
 
 const secret="synthetic-local-secret-not-a-real-credential";
 async function fixture(page:any,startup?:any) {
@@ -18,6 +39,7 @@ async function fixture(page:any,startup?:any) {
       env:{script:'$env:ANTHROPIC_BASE_URL="http://localhost:4141"\n$env:ANTHROPIC_AUTH_TOKEN="'+secret+'"\n$env:ANTHROPIC_MODEL="copilot-auto"'},
       refresh:{ok:true}
     };
+    result.quota={...result.status.auth,quotaRefresh:{state:"ready",attemptedAt:now,nextAttemptAt:now+15000}};
     if(path==="settings") {if(request.method()==="POST")settings=request.postDataJSON();await route.fulfill({json:settings});}
     else if(path in result)await route.fulfill({json:result[path]});
     else await route.fulfill({status:404,json:{error:{message:"Unexpected fixture path"}}});

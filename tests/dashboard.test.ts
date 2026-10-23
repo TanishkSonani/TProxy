@@ -104,3 +104,15 @@ test("model discovery reports TLS failure and recovers through dashboard refresh
     expect(status.startup.catalog.state).toBe("ready");expect(status.startup.catalog.message).toBeUndefined();
   }finally{proxy.stop();}
 });
+test("quota refresh stays authenticated and does not reinitialize credentials or reload models",async()=>{
+  const listener=Bun.listen({hostname:"127.0.0.1",port:0,socket:{data(){}}}),port=listener.port;listener.stop(true);
+  let quotas=0,models=0;
+  const auth:any={status:{source:"fixture",quotaUpdatedAt:1234},models:async()=>{models++;return {data:[]};},refreshQuota:async()=>{quotas++;return auth.status;},initialize:async()=>{throw new Error("Quota must not reinitialize authentication");},stop(){}};
+  const proxy=await startProxy(auth,{port,key:"quota-fixture",models:{},requireApiKey:false}),base=`http://127.0.0.1:${port}`;
+  try{
+    await proxy.startup;expect(models).toBe(1);
+    expect((await fetch(base+"/api/quota",{method:"POST"})).status).toBe(401);expect(quotas).toBe(0);
+    const response=await fetch(base+"/api/quota",{method:"POST",headers:{Authorization:"Bearer quota-fixture"}});
+    expect(response.status).toBe(200);expect((await response.json() as any).quotaUpdatedAt).toBe(1234);expect(quotas).toBe(1);expect(models).toBe(1);
+  }finally{proxy.stop();}
+});

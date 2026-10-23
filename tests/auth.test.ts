@@ -36,6 +36,36 @@ test("35 days of simulated refresh do not require another login",async()=>{
   for(let day=0;day<35;day++){h.advance(86400000);await manager.get();}
   expect(h.calls()).toBe(36);expect(manager.status.refreshEvents.every(e=>e.ok)).toBe(true);manager.stop();
 });
+test("quota-only refresh coalesces callers, caches briefly and respects Retry-After without refreshing model auth",async()=>{
+  const h=harness(),original=h.deps.fetch;let quotaCalls=0,mode:"ok"|"limited"|"missing"="ok";
+  const manager=new TokenManager(h.store,{}, {...h.deps,fetch:(async(url:any,init:any)=>{
+    if(String(url).endsWith("/copilot_internal/user")){quotaCalls++;if(mode==="limited")return new Response("",{status:429,headers:{"retry-after":"90"}});if(mode==="missing")return Response.json({});}
+    return original(url,init);
+  }) as any});
+  try{
+    await manager.initialize();const initialAt=manager.status.quotaUpdatedAt;expect(quotaCalls).toBe(1);
+    await manager.refreshQuota();expect(quotaCalls).toBe(1);
+    h.advance(16000);await Promise.all(Array.from({length:20},()=>manager.refreshQuota()));expect(quotaCalls).toBe(2);expect(h.calls()).toBe(1);expect(manager.status.quotaUpdatedAt).toBeGreaterThan(initialAt!);
+    const received=manager.status.quotaUpdatedAt;h.advance(16000);mode="limited";await manager.refreshQuota();
+    expect(manager.status.quotaRefresh?.state).toBe("error");expect(manager.status.quotaRefresh?.nextAttemptAt).toBe(h.deps.now()+90000);expect(manager.status.quotaUpdatedAt).toBe(received);
+    await manager.refreshQuota();h.advance(89999);await manager.refreshQuota();expect(quotaCalls).toBe(3);
+    h.advance(1);mode="ok";await manager.refreshQuota();expect(quotaCalls).toBe(4);expect(manager.status.quotaRefresh?.state).toBe("ready");
+    const savedQuota=manager.status.quota,at=manager.status.quotaUpdatedAt;h.advance(16000);mode="missing";await manager.refreshQuota();
+    expect(manager.status.quota).toEqual(savedQuota);expect(manager.status.quotaUpdatedAt).toBe(at);expect(manager.status.quotaRefresh?.state).toBe("error");expect(h.calls()).toBe(1);
+  }finally{manager.stop();}
+});
+test("quota refresh failures redact transport details and honor HTTP-date backoff",async()=>{
+  const h=harness(),original=h.deps.fetch;let mode:"ok"|"date"|"error"="ok",calls=0;
+  const manager=new TokenManager(h.store,{}, {...h.deps,fetch:(async(url:any,init:any)=>{
+    if(String(url).endsWith("/copilot_internal/user")){calls++;if(mode==="date")return new Response("",{status:429,headers:{"retry-after":new Date(h.deps.now()+120000).toUTCString()}});if(mode==="error")throw new Error("sensitive-transport-detail");}
+    return original(url,init);
+  }) as any});
+  try{
+    await manager.initialize();h.advance(16000);mode="date";await manager.refreshQuota();expect(manager.status.quotaRefresh?.nextAttemptAt).toBe(h.deps.now()+120000);
+    h.advance(120000);mode="error";await manager.refreshQuota();expect(manager.status.quotaRefresh?.state).toBe("error");expect(JSON.stringify(manager.status)).not.toContain("sensitive-transport-detail");
+    const previous=calls;await manager.refreshQuota();expect(calls).toBe(previous);expect((await manager.get()).token).toBe("copilot-1");
+  }finally{manager.stop();}
+});
 test("refresh failure can use a still-valid token but never an expired token",async()=>{
   const h=harness(),manager=await h.manager().initialize();h.advance(3550000);h.fail();
   expect((await manager.get()).token).toBe("copilot-1");h.advance(60000);await expect(manager.get()).rejects.toThrow();manager.stop();
