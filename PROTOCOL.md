@@ -119,7 +119,9 @@ The pinned messense listener supersedes the older cached web view showing 0.0.0.
 
 - Accessible native Claude model/account path for successful Messages, thinking, system, vision, limits and counting verification.
 - Separate paid individual, business and enterprise/EMU account captures.
-- Implemented auth/proxy/dashboard/packaging; restart, refresh/revocation and 30+ day soak evidence.
-- Actual Claude Code multi-turn/tool/subagent/model-switch/usage and forced auto-compaction acceptance. No working bridge/dashboard exists yet.
+- Auth/proxy/dashboard/packaging are implemented; Windows restart and cached-login reuse passed. Refresh/revocation and a wall-clock 30+ day soak remain open.
+- Real Claude Code Auto chat/tools/subagents/usage and custom-ID selection passed. Compaction recovery passed with an injected captured error; genuinely oversized CLI-context acceptance remains open. See milestone evidence for limits.
 
 Additional startup requirement: first-run CLI must use the local provider without Anthropic auth setup. Startup helpers and a local-stub interactive experiment on Claude Code 2.1.269 are recorded in [CLAUDE-FIRST-RUN.md](evidence/CLAUDE-FIRST-RUN.md); real-bridge integration and egress verification remain pending. Reused source components and licenses are tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Implementation update: real-bridge first-run and interactive usage now passed; complete egress verification remains open. Native auto-mode Bash and Agent classification also passed following a local Responses `stop_sequences` compatibility fix; [diagnosis and live results](evidence/AUTO-MODE-CLASSIFIER.md) distinguish this bridge bug from a provider outage. Responses stop matching is local and drains to actual upstream usage, so generated tokens after the match can still count. Current priority is Windows/Free/Auto; native Claude and other operating systems are deferred by the user.

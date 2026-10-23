@@ -4,6 +4,7 @@
 // external counting, forced 12800-token minimum, or tool-search shim is imported.
 import { ApiError,upstreamError } from "./errors";
 import { parseSSE,frame } from "./sse";
+import {stopSequences,stopMessage,stopStream} from "./stop-sequences";
 const CARRIER="ghcp-responses-v1:";
 function carry(item:any,model:string){return CARRIER+Buffer.from(JSON.stringify({model,item})).toString("base64url");}
 function uncarry(signature:string,model:string){
@@ -38,7 +39,7 @@ export function toResponses(payload:any,model:string,max:number,capabilities:any
     result.reasoning={effort:efforts.includes(requested)?requested:efforts.includes("medium")?"medium":efforts[0]};}
   if(payload.temperature!==undefined && !result.reasoning)result.temperature=payload.temperature;
   if(payload.top_p!==undefined && !result.reasoning)result.top_p=payload.top_p;
-  if(payload.stop_sequences?.length)throw new ApiError(400,"invalid_request_error","Selected Responses model does not expose stop sequences");
+  stopSequences(payload.stop_sequences); // Responses has no upstream stop parameter; enforce on returned text.
   if(payload.output_config?.format){const f=payload.output_config.format;if(f.type!=="json_schema")throw new ApiError(400,"invalid_request_error","Unsupported output format");result.text={format:{type:"json_schema",name:"response",schema:f.schema,strict:true}};}
   return result;
 }
@@ -52,17 +53,21 @@ export function responsesUsage(response:any){
 export function stopReason(response:any,hasTools=false){if(response.status==="incomplete"&&response.incomplete_details?.reason==="max_output_tokens")return "max_tokens";
   if(response.status!=="completed")throw new ApiError(502,"api_error","Provider generation did not complete");
   return hasTools||response.output?.some((i:any)=>i.type==="function_call")?"tool_use":"end_turn";}
-export function fromResponses(response:any,model:string){
+export function fromResponses(response:any,model:string,sequences:readonly string[]=[]){
   const content:any[]=[];
   for(const item of response.output??[]){
     if(item.type==="message")for(const part of item.content??[])if(part.type==="output_text")content.push({type:"text",text:part.text});else if(part.type==="refusal")content.push({type:"text",text:part.refusal});
     if(item.type==="function_call"){let input;try{input=JSON.parse(item.arguments);}catch{throw new ApiError(502,"api_error","Provider returned invalid tool arguments");}content.push({type:"tool_use",id:item.call_id,name:item.name,input});}
     if(item.type==="reasoning")content.push({type:"thinking",thinking:(item.summary??[]).map((s:any)=>s.text??"").join("\n"),signature:carry(item,model)});
   }
-  return {id:response.id,type:"message",role:"assistant",model,content,stop_reason:stopReason(response),stop_sequence:null,usage:responsesUsage(response)};
+  return stopMessage({id:response.id,type:"message",role:"assistant",model,content,stop_reason:stopReason(response),stop_sequence:null,usage:responsesUsage(response)},sequences);
 }
 
-export async function* responsesStream(response:Response,model:string,onComplete:(message:any)=>void):AsyncGenerator<string> {
+export async function* responsesStream(response:Response,model:string,onComplete:(message:any)=>void,sequences:readonly string[]=[]):AsyncGenerator<string> {
+  if(sequences.length){yield* stopStream(rawResponsesStream(response,model,()=>{}),sequences,onComplete);return;}
+  yield* rawResponsesStream(response,model,onComplete);
+}
+async function* rawResponsesStream(response:Response,model:string,onComplete:(message:any)=>void):AsyncGenerator<string> {
   if(!response.body)throw new ApiError(502,"api_error","Provider returned an empty stream");
   let started=false,completed=false,next=0,hasTools=false;
   const blocks=new Map<string,{index:number;open:boolean;delta:boolean;item?:any}>();

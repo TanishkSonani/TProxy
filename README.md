@@ -4,6 +4,8 @@ A localhost gateway that runs the installed Claude Code CLI against account-enti
 
 **Preview: working Windows binary, with acceptance checks outstanding.** Real Claude Code chat, streaming, Read/Edit/Bash, a foreground subagent, token usage and automatic compaction recovery have passed through Copilot Auto. The tested free account selects `gpt-6-luna`; native Claude calls are rejected by its account path. Free, individual paid, business and enterprise share endpoint discovery, subject to actual entitlements. Other plans have not been tested live.
 
+Current acceptance scope is Windows + Copilot Free + Auto; native Claude entitlement and macOS/Linux acceptance are deferred. Auto-mode classification for Bash, Agent and subagent hand-back has now passed live after fixing local Responses stop-sequence handling. See [classifier diagnosis and verification](evidence/AUTO-MODE-CLASSIFIER.md). The fix preserves Claude's safety checks; it does not bypass unavailable or denied classification.
+
 ## Run on Windows
 
 ```powershell

@@ -10,6 +10,7 @@ import type { MetricsStore } from "../dashboard/store";
 import { claudeEnvironment } from "../client/claude-launch";
 import { generateEnvScript } from "../client/env-script";
 import { DeviceFlow } from "../auth/device-flow";
+import {stopSequences} from "./stop-sequences";
 
 export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number};
 export type RequestRecord={id:string;at:number;model:string;status:number;latency:number;input:number;output:number;tools:number;session:string;estimated?:boolean;body?:unknown;cacheRead?:number;cacheWrite?:number};
@@ -142,7 +143,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
         const response=await client.request(path,body,headers,controller.signal);
         const responseId=response.headers.get("request-id")??response.headers.get("x-request-id")??id;
         if(!response.ok){let data;try{data=await response.json();}catch{}throw upstreamError(response.status,data,response.headers.get("retry-after")??undefined);}
-        if(!payload.stream){const data=await response.json();const message=path==="/responses"?fromResponses(data,selected):path==="/chat/completions"?fromChat(data,selected):data;record(message);return Response.json(message,{headers:{"request-id":responseId}});}
+        if(!payload.stream){const data=await response.json();const message=path==="/responses"?fromResponses(data,selected,stopSequences(payload.stop_sequences)):path==="/chat/completions"?fromChat(data,selected):data;record(message);return Response.json(message,{headers:{"request-id":responseId}});}
         async function* nativeStream(){let complete=false;const final:any={usage:{},content:[]};
           if(!response.body)throw new ApiError(502,"api_error","Empty provider stream");
           for await(const raw of parseSSE(response.body)){let event:any;try{event=JSON.parse(raw.data);}catch{throw new ApiError(502,"api_error","Malformed provider stream");}
@@ -154,7 +155,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
             yield `event: ${raw.event==="message"?event.type:raw.event}\ndata: ${raw.data}\n\n`;
           }if(!complete)throw new ApiError(502,"api_error","Provider stream ended before message_stop");
         }
-        async function* stream(){try{yield* (path==="/responses"?responsesStream(response,selected,record):path==="/chat/completions"?chatStream(response,selected,record):nativeStream());}
+        async function* stream(){try{yield* (path==="/responses"?responsesStream(response,selected,record,stopSequences(payload.stop_sequences)):path==="/chat/completions"?chatStream(response,selected,record):nativeStream());}
           catch(error){record(null,error instanceof ApiError?error.status:502);yield frame(errorBody(error));}
           finally{abort();request.signal.removeEventListener("abort",abort);}}
         return new Response(eventStream(stream(),()=>{record(null,499);abort();}),{headers:{"content-type":"text/event-stream","cache-control":"no-cache","request-id":responseId}});
