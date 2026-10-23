@@ -2,7 +2,7 @@
 
 Local bridge research for Claude Code using account-entitled GitHub Copilot models, including non-Anthropic models. Required plans: individual free, individual paid, business and enterprise. Availability depends on the authenticated account's models, protocol capabilities and policy.
 
-**Current state: M0 live evidence recorded; no working bridge or dashboard yet.** Existing VS Code auth was reused successfully. Copilot Auto/Responses streaming, tools, vision and overflow were verified on the current free account. Native Claude access remains unverified because the service rejected the tested model. See [PROTOCOL.md](PROTOCOL.md) and [live findings](evidence/LIVE-2026-10-23.md).
+**Current state: M1 Windows auth checkpoint implemented and live-tested; proxy/dashboard still in progress.** Existing VS Code auth and a Windows Credential Manager cache work across process restarts. See [M1 findings](evidence/M1-AUTH.md), [PROTOCOL.md](PROTOCOL.md) and [live findings](evidence/LIVE-2026-10-23.md). Native Claude access remains unverified because the service rejected the tested model.
 
 ```powershell
 bun run research:preflight
