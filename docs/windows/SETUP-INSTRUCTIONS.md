@@ -19,7 +19,7 @@ It uses the normal Windows PowerShell and .NET Framework desktop components supp
      icons\tproxy-off.ico
    ```
 
-   For this Windows account the usual location is `C:\Users\Tanishk\AppData\Local\Programs\TProxy`. This is on the C drive and writable without administrator access. Do not use `C:\Program Files` or a shared/public directory.
+   This normally resolves to `C:\Users\<your-user>\AppData\Local\Programs\TProxy` and is writable without administrator access. Do not use `C:\Program Files` or a shared/public directory.
 3. Double-click `Open-TProxy-Terminal.cmd`. In that terminal run:
 
    ```cmd
@@ -111,7 +111,7 @@ tproxy setup
 
 Migration copies the legacy `%LOCALAPPDATA%\ghcp-bridge` SQLite history/config and protected credentials into TProxy, verifies database integrity, and preserves the old profile for rollback. It refuses to overwrite an existing TProxy database/config. It does not change the normal Claude conversation storage. No OAuth flow is required when your existing session remains valid.
 
-For this machine's completed migration, the old profile is retained under `%LOCALAPPDATA%\TProxy\legacy-backup`. This is a rollback copy, not a second running service. Development conversation material is archived separately under `development-archive`; neither archive is in the executable folder.
+Keep the original profile as a private rollback copy until you have verified the migrated account and history. Migration does not delete the original profile or start another service. Do not add either profile to source control.
 
 When updating an existing TProxy installation, close its controller with `tproxy-desktop.exe --quit-monitor`, stop the server, replace only the six package files, and run `tproxy setup` again. Keep the private data directory. Do not replace a running executable.
 

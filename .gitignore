@@ -1,5 +1,6 @@
 .research/
-evidence/private/
+evidence/
+.claude/
 node_modules/
 dist/
 release/
@@ -9,3 +10,12 @@ codex-session-*.md
 .env.*
 __pycache__/
 *.pyc
+*.log
+*.har
+*.mitm
+*.pem
+*.key
+config.local.json
+runtime.json
+desktop-status.json
+desktop-registration.json

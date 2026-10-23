@@ -1,106 +1,123 @@
-# GHCP → Claude Bridge
+# TProxy
 
-A localhost gateway that runs the installed Claude Code CLI against account-entitled GitHub Copilot models. Claude models use Copilot's native Messages endpoint; other models have separate Responses and Chat Completions adapters. Metrics stay in local SQLite WAL.
+A local gateway that connects your installed Claude Code CLI to models available through your GitHub Copilot account. Claude models use Copilot's native Messages endpoint; other models use Responses or Chat Completions adapters. An offline dashboard stores usage in local SQLite.
 
-**Preview: working Windows binary, with acceptance checks outstanding.** Real Claude Code chat, streaming, Read/Edit/Bash, a foreground subagent, token usage and automatic compaction recovery have passed through Copilot Auto. The tested free account selects `gpt-6-luna`; native Claude calls are rejected by its account path. Free, individual paid, business and enterprise share endpoint discovery, subject to actual entitlements. Other plans have not been tested live.
+**Preview:** tested on Windows with Copilot Free and Auto. Paid, business and enterprise accounts use discovered endpoints and account entitlements, but have not been verified live. Full Anthropic feature parity is not guaranteed. See [known limitations](docs/LIMITATIONS.md).
 
-Current acceptance scope is Windows + Copilot Free + Auto; native Claude entitlement and macOS/Linux acceptance are deferred. Auto-mode classification for Bash, Agent and subagent hand-back has now passed live after fixing local Responses stop-sequence handling. See [classifier diagnosis and verification](evidence/AUTO-MODE-CLASSIFIER.md). The fix preserves Claude's safety checks; it does not bypass unavailable or denied classification.
+## Windows quick start
 
-## Run on Windows
+Claude Code must already be installed. The packaged utility needs no administrator rights, Bun installation or permanent PATH changes.
+
+1. Build the portable package using the instructions below, or obtain a trusted TProxy Windows package.
+2. Copy the complete `TProxy` folder to `%LOCALAPPDATA%\Programs\TProxy`.
+3. Double-click `Open-TProxy-Terminal.cmd` in that folder.
+4. In the opened terminal, run:
+
+   ```cmd
+   tproxy setup
+   tproxy desktop
+   ```
+
+5. Click **Start server**, then **Open dashboard**. In the TProxy terminal, launch Claude:
+
+   ```cmd
+   tproxy claude
+   ```
+
+The desktop and tray icons turn green when the proxy responds and grey when it stops. The monitor must be running to update the desktop icon. Login startup runs the monitor, not the proxy.
+
+For an ordinary **PowerShell** terminal where `tproxy` is not recognized, use the full path:
 
 ```powershell
-.\tproxy.exe start
+& "$env:LOCALAPPDATA\Programs\TProxy\tproxy.exe" dashboard
+& "$env:LOCALAPPDATA\Programs\TProxy\tproxy.exe" claude
 ```
 
-The installed Windows utility is `%LOCALAPPDATA%\Programs\TProxy`. Double-click the TProxy desktop shortcut for Start/Stop controls. Green/grey icons track ON/OFF while the per-user monitor runs, including CLI starts/stops. See [step-by-step Windows setup](docs/windows/SETUP-INSTRUCTIONS.md).
+The bare localhost URL does not grant dashboard access. Use **Open dashboard** or the private link printed by `tproxy dashboard`. Keep that link private.
 
-Open the private dashboard link printed by `start`. To get a link again, run `tproxy.exe dashboard`. Opening the bare localhost URL shows an access screen; it does not grant management access. In another terminal:
+See the [step-by-step Windows guide](docs/windows/SETUP-INSTRUCTIONS.md) for installation, upgrades, troubleshooting and removal.
 
-```powershell
-.\tproxy.exe claude
+## Features
+
+- Streaming, tool calls, model mapping, vision and provider usage forwarding, subject to model capabilities.
+- Existing-login reuse: environment token, GitHub CLI, Windows VS Code session, then OAuth device flow.
+- Copilot endpoint discovery for individual and organizational accounts, plus explicit GitHub host selection for enterprise managed users.
+- Metadata-driven context windows and Anthropic-format overflow errors; no usage multipliers or automatic history truncation.
+- Local React dashboard: status, usage heatmap, latency, request log, observed limits and settings.
+- Windows desktop controls and status monitor; single executable CLI builds for other platforms.
+
+The launcher supplies the local provider settings and prepares first-run onboarding. Normal Claude storage, hooks, MCP and tool permissions remain in use; workspace trust and corporate policy still apply.
+
+## Commands
+
+Run these in the TProxy terminal, or substitute the full executable path:
+
+```cmd
+tproxy start
+tproxy status
+tproxy dashboard
+tproxy claude
+tproxy claude -- --model copilot-auto
+tproxy stop
+tproxy auth
+tproxy env
+tproxy licenses
 ```
 
-The launcher reuses the installed `claude`, prepares first-run onboarding and supplies the local proxy credential. It preserves normal Claude storage, hooks, local MCP and tool permissions. A new workspace can still ask for normal trust. Use the launcher for first-run setup; starting the proxy alone cannot change another terminal's environment.
+`start` runs in the foreground. The desktop controller starts it in the background. `claude` can start an owned proxy and stop it when Claude exits; it leaves an already-running proxy alone.
 
-```powershell
-.\tproxy.exe status
-.\tproxy.exe dashboard
-.\tproxy.exe stop
-.\tproxy.exe auth
-.\tproxy.exe env
-.\tproxy.exe claude -- --model copilot-auto
-```
+Options include `--port N`, `--config FILE` and `--data-dir DIR`. Default listen address: `127.0.0.1:4141`. Default Windows data directory: `%LOCALAPPDATA%\TProxy`. Never commit a runtime data directory or the secret output of `env`.
 
-`start` runs in the foreground. `claude` can start an owned proxy and stop it when Claude exits or setup fails. The Windows controller provides a tray status monitor and per-user login shortcut; it does not automatically start the proxy. Commands accept `--port N`, `--config FILE` and `--data-dir DIR`. Default Windows storage is `%LOCALAPPDATA%\TProxy`; credentials use Windows Credential Manager, with a CurrentUser-DPAPI encrypted-file fallback for records beyond the vault's size limit. Retention defaults to 90 days. A small runtime file tracks the active port when a saved port change is pending. Keep custom data directories private; launcher settings there include the local proxy key.
+## Configuration and authentication
 
-`env` prints shell settings, including a secret local proxy key. Keep that output out of logs/source control. It sets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL` and model slots, and clears conflicting API-key/OAuth/provider variables. Environment setup alone can still show first-run onboarding. A complete audit that Claude makes no Anthropic/background connections remains pending.
-
-## Authentication and discovery
-
-Order: `GH_TOKEN` / `GITHUB_TOKEN`, `gh auth token`, Windows VS Code GitHub session, then explicit OAuth device authorization. Existing logins are tried before offering device flow. Copilot tokens refresh and are cached in the Windows vault. macOS/Linux currently use a restricted 0600-file fallback; their VS Code session decryption is not implemented.
-
-The upstream host comes from token exchange endpoints, including business/enterprise hosts. Configure `auth.githubHost` for EMU, or select a logged-in gh host. Multiple identities require a choice. Copilot discovery uses manifest identity across bundled/versioned, portable, Stable/Insiders, custom and PATH layouts. Extension location and sign-in storage are separate. Malformed configuration types are rejected and saves are atomic. An explicit `--data-dir` overrides the file's directory. Use separate profiles/directories for separate accounts.
-
-Example configuration; every auth override is optional:
+Configuration is stored in the data directory's `config.json`. Example:
 
 ```json
 {
   "port": 4141,
   "retentionDays": 90,
-  "contextFallbackTokens": 200000,
   "requireApiKey": true,
-  "models": {"default":"copilot-auto","sonnet":"copilot-auto","opus":"copilot-auto","haiku":"copilot-auto"},
-  "auth": {
-    "githubHost": "github.com",
-    "vscodePaths": ["D:\\Apps\\VS Code"],
-    "extensionPaths": ["D:\\Custom Extensions"],
-    "userDataDirs": ["D:\\VSCodeData"],
-    "sharedDataDirs": ["D:\\VSCodeSharedData"]
+  "contextFallbackTokens": 200000,
+  "models": {
+    "default": "copilot-auto",
+    "sonnet": "copilot-auto",
+    "opus": "copilot-auto",
+    "haiku": "copilot-auto"
   }
 }
 ```
 
-`GHCP_COPILOT_PATH`, `GHCP_VSCODE_PATH`, `VSCODE_EXTENSIONS` and `VSCODE_PORTABLE` are also supported. Remote/WSL credentials must be accessed where the bridge runs; it does not inspect another machine automatically. Arbitrary undiscoverable locations require an explicit path.
+Map slots to model IDs available on your account using the dashboard. Listing a model does not guarantee generation entitlement. Explicit unavailable models fail rather than silently switching to Auto.
 
-The launcher fetches fresh Copilot `/models` metadata and resolves `/auto` when an Auto slot is used. The client window comes from the applicable per-model prompt/total limits, including a CLI `--model` selection. There is no default 200k cap. `contextFallbackTokens` is used only when Copilot omits limits and is explicitly labeled as fallback; optional `contextWindowTokens` adds a user ceiling. It keeps proactive compaction enabled and reports actual usage without multipliers. Relaunch Claude to apply discovery; existing processes keep their launch settings. Auto discovery is a metadata probe, not a guarantee that every subsequent prompt selects the same model. Future Auto/manual switches and oversized tool results still need the native prompt-too-long recovery path. See [context verification](evidence/CONTEXT-WINDOW.md).
+Authentication checks `GH_TOKEN` / `GITHUB_TOKEN`, `gh auth token`, then existing Windows VS Code sessions before offering device authorization. Windows credentials use Credential Manager with an encrypted CurrentUser-DPAPI fallback. macOS/Linux currently use restricted files and do not decrypt VS Code sessions.
 
-## Dashboard
+Custom installations can specify `auth.vscodePaths`, `auth.extensionPaths`, `auth.userDataDirs` and `auth.sharedDataDirs` as path arrays. `auth.githubHost` selects a GitHub host. Remote/WSL credentials must be accessible where TProxy runs. Use separate data directories for separate accounts.
 
-Five offline React views: Status, Usage, Live log, Limits and Settings. They display account/auth/TTL, shell setup, per-model totals, activity heatmap, daily series, p50/p95 latency, errors, tool ratio, session spans, redacted requests, refresh events, observed headers and returned account quota. Premium estimates are N/A; billing is not invented. Model mappings apply immediately; port changes require restart.
-
-New request logs redact string values, arbitrary keys, nested tool inputs and non-protocol numbers before SQLite insertion. This preview uses Bun's `bun:sqlite` because `better-sqlite3` failed to install without Windows C++ tools. The user approved this driver change; see [M3 findings](evidence/M3-DASHBOARD.md). Management requires an authenticated dashboard link/session or proxy key even when model API-key enforcement is disabled. Dashboard links are credentials: keep them private. The fragment is removed after the local session handshake and is not sent as a query parameter. No external fonts, scripts, CDN calls or dashboard telemetry are used.
+Context limits come from Copilot model metadata. `contextFallbackTokens` applies only when limits are unavailable; optional `contextWindowTokens` imposes a ceiling. Relaunch Claude after changing models or limits.
 
 ## Develop and build
+
+Prerequisites: Bun; Python for generated Windows icons and research checks; installed .NET Framework compiler for the Windows desktop controller.
 
 ```powershell
 bun install --frozen-lockfile
 bun test
 bun run typecheck
 bun run build
-bun run build:all
 bun run package:windows
 ```
 
-`package:windows` produces the six-file portable Windows package under `dist/TProxy`; copy that folder to `%LOCALAPPDATA%\Programs\TProxy` and run `tproxy setup`.
+- `build`: host CLI executable with embedded dashboard and license notices.
+- `package:windows`: portable six-file utility under `dist/TProxy`.
+- `build:all`: Windows x64, macOS arm64/x64 and Linux arm64/x64 executables. Only Windows has been tested live.
+- Source execution: `bun run build:ui`, then `bun run start` and `bun run claude` in separate terminals.
 
-`build` creates the host executable. `build:all` creates Windows x64, macOS arm64/x64 and Linux arm64/x64 executables plus checksums under `dist/`. UI and license notices are embedded; binaries need no Bun installation or asset folder. Only Windows has been runtime tested; other targets still need platform testing. See [packaging evidence](evidence/M4-PACKAGING.md).
+Source lives in `src/`, dashboard code in `dashboard/`, regression tests in `tests/` and build/diagnostic tools in `scripts/`. Optional research tools write to ignored local directories and are not runtime dependencies.
 
-For source execution, run `bun run build:ui`, then `bun run start` and `bun run claude` in separate terminals. `research:preflight`, `research:discover` and `research:extension` inspect local prerequisites/static source without model calls. Private captures, credentials and test profiles are ignored under `evidence/private/` and `.research/`.
+## Privacy and compatibility
 
-## Evidence and remaining acceptance
+TProxy binds to localhost and adds no third-party telemetry or dashboard CDN calls. Model requests go to GitHub/Copilot; authentication also contacts GitHub. Metrics remain local in SQLite WAL with redacted request content. Dashboard management requires a private authenticated link/session or proxy key.
 
-[PROTOCOL.md](PROTOCOL.md) distinguishes observations from assumptions. See [M1 auth](evidence/M1-AUTH.md), [M2 proxy](evidence/M2-PROXY.md), [M3 dashboard](evidence/M3-DASHBOARD.md), and [first-run findings](evidence/CLAUDE-FIRST-RUN.md).
+This is not a guarantee about network activity from Claude Code, hooks, MCP servers or tools. See [limitations](docs/LIMITATIONS.md), the [protocol notes](PROTOCOL.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
-- Native Claude is mock-tested but unavailable on the tested account. No live native Claude success is claimed.
-- Auto-compaction recovered from an injected captured real overflow error, then continued with real Copilot calls. This was not a 900k-token live CLI conversation.
-- Reasoning history is replayable within its provider/model; crossing vendors can require a fresh conversation. Provider-specific server tools and full Anthropic feature parity are not established.
-- Claude's dollar figures for custom model IDs are estimates with unknown cost basis, not Copilot charges. Interactive `/usage` displays real token counts; cross-vendor `/model` still needs an entitled account.
-- Refresh coverage simulates 35 days; it is not a completed soak. Visual browser QA and a complete process-level egress audit remain pending. Managed corporate settings can prevent provider redirection.
-
-Reuse is tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); `tproxy licenses` prints bundled notices.
-
-The [real-world hardening review](evidence/REAL-WORLD-REVIEW.md) compares pinned reference implementations, lists regression coverage and separates remaining limitations from completed fixes. Local managed settings and extra `--settings` files are checked for routing conflicts before Claude starts; policies are never edited. Dynamic policy helpers require administrator verification rather than being bypassed. This is a conservative preflight, not a complete policy-engine replacement.
-
-Unsupported by GitHub. Use may violate Copilot terms and corporate policy, may be audit-logged, and may risk seat enforcement. Keep usage interactive and low-volume. Account entitlements and organization policy are never bypassed.
-
-Generated binaries, dependencies and disposable private captures have been moved into `%LOCALAPPDATA%\TProxy\development-archive` for reversible cleanup. Research-cache cleanup is partial: automatic review blocked permanent deletion, and Windows denied moving a cached repository's `.git` directory. Source, tests, pinned reference metadata, licenses and sanitized evidence are retained so the utility remains maintainable. Run `bun install --frozen-lockfile` before rebuilding. The six-file desktop runtime has no dependency on this source checkout. Archiving does not free disk space.
+**Unsupported by GitHub and Anthropic.** Use may violate Copilot terms or corporate policy, may be audit-logged and may risk seat enforcement. Keep usage interactive and low-volume. TProxy does not bypass account entitlements or organizational policy.
