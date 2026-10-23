@@ -2,12 +2,13 @@
 import { existsSync,mkdirSync,writeFileSync,readFileSync,unlinkSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
-import { join,resolve,dirname } from "node:path";
+import { join,resolve } from "node:path";
 import { loadConfig,saveConfig } from "./config";
 import { MetricsStore } from "./dashboard/store";
 import { secretStore } from "./auth/secure-store";
 import { TokenManager } from "./auth/token-manager";
 import { DeviceFlow } from "./auth/device-flow";
+import { createOutboundFetch } from "./auth/https";
 import { startProxy } from "./proxy/server";
 import { claudeEnvironment,prepareClaudeOnboarding } from "./client/claude-launch";
 import { generateEnvScript } from "./client/env-script";
@@ -15,12 +16,13 @@ import {notices} from "./notices";
 import {checkManagedRouting,readManagedSettings,readExtraSettings} from "./client/managed-settings";
 import {withProfileLock} from "./profile-lock";
 import {migrateLegacyData} from "./migrate";
+import {hasCompleteWindowsPackage,windowsPackageRoot} from "./windows/package-path";
 
 const args=process.argv.slice(2),command=args.shift()??"start";
 if(["--help","help","-h"].includes(command)){
   console.log("TProxy\nUsage: tproxy start|stop|status|auth|env|claude|dashboard|desktop|setup|migrate|licenses\nOptions: --port N --config FILE --data-dir DIR --quiet\nClaude: --claude-config-dir DIR -- [Claude Code arguments]\nDesktop: tproxy setup registers shortcuts; tproxy desktop opens controls\nDashboard: tproxy dashboard prints a private access link\nUse tproxy claude for first-run setup and local routing.");process.exit(0);
 }
-if(command==="--version"){console.log("TProxy 0.2.1-preview");process.exit(0);}
+if(command==="--version"){console.log("TProxy 1.0.0-preview");process.exit(0);}
 if(command==="licenses"){console.log(notices);process.exit(0);}
 let configPath:string|undefined,dataDir:string|undefined,port:number|undefined,quiet=false,claudeConfig:string|undefined;
 const childArgs:string[]=[];
@@ -37,7 +39,8 @@ for(let i=0;i<args.length;i++){
   const config=loadConfig(configPath,dataDir);if(port!==undefined)config.port=port;
   if(command==="migrate"){console.log(JSON.stringify(await migrateLegacyData(config.dataDir),null,2));process.exit(0);}
   if(command==="setup"||command==="desktop"){
-    const controller=join(dirname(process.execPath),"tproxy-desktop.exe");if(process.platform!=="win32"||!existsSync(controller))throw new Error("Use this command from the installed Windows TProxy package");
+    const packageRoot=windowsPackageRoot(),controller=join(packageRoot,"tproxy-desktop.exe");
+    if(process.platform!=="win32"||!hasCompleteWindowsPackage(packageRoot))throw new Error("Extract the complete TProxy package to %LOCALAPPDATA%\\Programs\\TProxy before running setup or desktop.");
     const child=Bun.spawn([controller,...(command==="setup"?["--register"]:[])],{stdin:"ignore",stdout:"ignore",stderr:"ignore",windowsHide:true});
     if(command==="setup"){if(await child.exited!==0)throw new Error("Desktop registration failed; inspect desktop.log in the private TProxy data directory");let login=false;try{login=JSON.parse(readFileSync(join(config.dataDir,"desktop-registration.json"),"utf8")).startupRegistered===true;}catch{}console.log(login?"TProxy desktop shortcut and login status monitor registered":"TProxy desktop shortcut registered; open the controller after login if startup is restricted");}else{child.unref();console.log("TProxy desktop controls opened");}process.exit(0);
   }
@@ -58,11 +61,12 @@ for(let i=0;i<args.length;i++){
     const env=claudeEnvironment(connection,{});env.ANTHROPIC_API_KEY=undefined;env.CLAUDE_CODE_OAUTH_TOKEN=undefined;
     console.log(generateEnvScript(env,process.platform==="win32"?"powershell":"bash"));
   } else {
-    const auth=new TokenManager(secretStore(config.dataDir),config.auth);
+    const outboundFetch=createOutboundFetch(config.tls.caFile);
+    const auth=new TokenManager(secretStore(config.dataDir),config.auth,{fetch:outboundFetch});
     if(command==="auth") {
       try{await auth.initialize();console.log(JSON.stringify(auth.status,null,2));}
       catch(error){if(!(error instanceof Error)||!error.message.startsWith("AUTH_REQUIRED"))throw error;
-        const flow=new DeviceFlow(config.auth.githubHost);const code=await flow.start();console.log(`Open ${code.verification_uri} and enter ${code.user_code}`);
+        const flow=new DeviceFlow(config.auth.githubHost, outboundFetch);const code=await flow.start();console.log(`Open ${code.verification_uri} and enter ${code.user_code}`);
         await auth.useCredential(await flow.poll(code));console.log(JSON.stringify(auth.status,null,2));}
       finally{auth.stop();}
     } else {
@@ -72,8 +76,8 @@ for(let i=0;i<args.length;i++){
         const unsubscribe=auth.onRefresh(event=>metrics.refresh(event));
         const timer=setInterval(()=>metrics.prune(config.retentionDays),6*60*60*1000);timer.unref();
         let closed=false;const cleanup=()=>{if(closed)return;closed=true;clearInterval(timer);unsubscribe();metrics.close();try{if(JSON.parse(readFileSync(runtimeFile,"utf8")).pid===process.pid)unlinkSync(runtimeFile);}catch{}};
-        try{try{await auth.initialize();}catch(error){if(!(error instanceof Error)||!error.message.startsWith("AUTH_REQUIRED"))throw error;}
-          const running=await startProxy(auth,{...config,key},{metrics,saveSettings:settings=>{Object.assign(config,settings);saveConfig(configPath??join(config.dataDir,"config.json"),config);},onStop:()=>{cleanup();process.exit(0);}});
+        try{
+          const running=await startProxy(auth,{...config,key},{metrics,transport:outboundFetch,initializeAuth:()=>auth.initialize(),saveSettings:settings=>{Object.assign(config,settings);saveConfig(configPath??join(config.dataDir,"config.json"),config);},onStop:()=>{cleanup();process.exit(0);}});
           writeFileSync(runtimeFile,JSON.stringify({pid:process.pid,port:config.port}),{mode:0o600});
           const stop=running.stop.bind(running);running.stop=()=>{stop();cleanup();};return running;
         }catch(error){cleanup();auth.stop();throw error;}
@@ -82,8 +86,9 @@ for(let i=0;i<args.length;i++){
         try {const response=await localRequest("/api/status");if(!response.ok)throw new Error("TProxy running with another credential/profile");}
         catch(error){if(error instanceof Error&&error.message.startsWith("TProxy running"))throw error;proxy=await boot();}
       } else {proxy=await boot();}
+      if(command==="claude"&&proxy)await proxy.startup;
       if(command==="start"){
-        console.log(`TProxy listening on ${url}; auth=${auth.status.source}; account=${auth.status.login??"unknown"}`);
+        console.log(`TProxy listening on ${url}; upstream authentication is initializing in the background.`);
         if(!quiet)console.log(`Dashboard: ${proxy!.dashboardURL}\nLaunch with: tproxy claude\nCopy shell settings with: tproxy env`);
         process.on("SIGINT",()=>{proxy?.stop();process.exit(0);});process.on("SIGTERM",()=>{proxy?.stop();process.exit(0);});
       } else {

@@ -13,10 +13,10 @@ using System.Security.Cryptography;
 using System.Text;
 [assembly: System.Reflection.AssemblyTitle("TProxy Desktop")]
 [assembly: System.Reflection.AssemblyProduct("TProxy")]
-[assembly: System.Reflection.AssemblyVersion("0.2.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
 
 internal static class Paths {
-    internal static readonly string Root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+    internal static readonly string Root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "TProxy");
     internal static readonly string Exe = Path.Combine(Root, "tproxy-desktop.exe");
     internal static readonly string Cli = Path.Combine(Root, "tproxy.exe");
     internal static readonly string Data = Environment.GetEnvironmentVariable("TPROXY_DATA_DIR") ?? Environment.GetEnvironmentVariable("GHCP_BRIDGE_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TProxy");
@@ -55,7 +55,7 @@ internal static class Shortcuts {
     }
     internal static void Update(bool on) { if(File.Exists(Paths.Desktop)) Save(Paths.Desktop,on,false); }
     internal static void Register() {
-        if(!File.Exists(Paths.Cli) || !File.Exists(Paths.Icon(false)) || !File.Exists(Paths.Icon(true))) throw new InvalidOperationException("Keep all TProxy package files together before registering.");
+        if(!File.Exists(Paths.Exe) || !File.Exists(Paths.Cli) || !File.Exists(Paths.Icon(false)) || !File.Exists(Paths.Icon(true))) throw new InvalidOperationException("Extract the complete TProxy package to %LOCALAPPDATA%\\Programs\\TProxy and run setup again.");
         Directory.CreateDirectory(Paths.Data);Save(Paths.Desktop,false,false);bool startup=true;
         try { Save(Paths.Startup,false,true); } catch(Exception e) { startup=false;Paths.Log("Login monitor shortcut unavailable: "+e.Message); }
         File.WriteAllText(Path.Combine(Paths.Data,"desktop-registration.json"),Paths.Json.Serialize(new {desktop=Paths.Desktop,startupRegistered=startup,installed=Paths.Root}));
@@ -148,6 +148,7 @@ internal static class Program {
             if(Array.IndexOf(args,"--quit-monitor")>=0){Signal("Quit");return 0;}
             if(Array.IndexOf(args,"--unregister")>=0){Signal("Quit");Shortcuts.RemoveOwned(Paths.Desktop);Shortcuts.RemoveOwned(Paths.Startup);return 0;}
             if(Array.IndexOf(args,"--register")>=0){Shortcuts.Register();return 0;}
+            if(!File.Exists(Paths.Exe)||!File.Exists(Paths.Cli)||!File.Exists(Paths.Icon(false))||!File.Exists(Paths.Icon(true)))throw new InvalidOperationException("Extract the complete TProxy package to %LOCALAPPDATA%\\Programs\\TProxy before opening the desktop controller.");
             bool created;using(var mutex=new Mutex(true,"Local\\TProxy-"+Paths.Identity,out created)){
                 bool toggle=Array.IndexOf(args,"--toggle")>=0;
                 if(!created){if(toggle)Signal("Toggle");else if(Array.IndexOf(args,"--monitor")<0)Signal("Show");return 0;}

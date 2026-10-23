@@ -18,11 +18,14 @@ const temporary:string[]=[];
 afterEach(()=>{for(const dir of temporary.splice(0)){if(!resolve(dir).startsWith(resolve(tmpdir())+sep))throw new Error("Unsafe test cleanup path");rmSync(dir,{recursive:true,force:true});}});
 test("configuration rejects ambiguous types and explicit data-dir wins over the config file",()=>{
   const dir=mkdtempSync(join(tmpdir(),"bridge-config-"));temporary.push(dir);const file=join(dir,"config.json");
-  for(const input of [null,[],{requireApiKey:"false"},{models:{default:5}},{models:null},{auth:[]},{auth:{vscodePaths:"D:/custom"}},{retentionDays:3661},{dataDir:5}]){
+  for(const input of [null,[],{requireApiKey:"false"},{models:{default:5}},{models:null},{auth:[]},{auth:{vscodePaths:"D:/custom"}},{tls:[]},{tls:{caFile:" "}},{retentionDays:3661},{dataDir:5}]){
     writeFileSync(file,JSON.stringify(input));expect(()=>loadConfig(file,dir)).toThrow();
   }
-  writeFileSync(file,JSON.stringify({dataDir:"D:/old-profile",models:{default:"custom"}}));
-  const config=loadConfig(file,dir);expect(config.dataDir).toBe(resolve(dir));saveConfig(file,config);expect(JSON.parse(readFileSync(file,"utf8")).models.default).toBe("custom");expect(readdirSync(dir).filter(p=>p.endsWith(".tmp"))).toHaveLength(0);
+  writeFileSync(file,JSON.stringify({dataDir:"D:/old-profile",models:{default:"custom"},tls:{caFile:"certs/org-root.pem"}}));
+  const config=loadConfig(file,dir);expect(config.dataDir).toBe(resolve(dir));expect(config.tls.caFile).toBe(resolve(dir,"certs/org-root.pem"));saveConfig(file,config);expect(JSON.parse(readFileSync(file,"utf8")).models.default).toBe("custom");expect(readdirSync(dir).filter(p=>p.endsWith(".tmp"))).toHaveLength(0);
+  const previous=process.env.TPROXY_CA_FILE;
+  try{process.env.TPROXY_CA_FILE=join(dir,"approved-root.pem");expect(loadConfig(file,dir).tls.caFile).toBe(resolve(dir,"approved-root.pem"));}
+  finally{if(previous===undefined)delete process.env.TPROXY_CA_FILE;else process.env.TPROXY_CA_FILE=previous;}
 });
 test("malformed message/block/tool types fail as client errors before provider dispatch",()=>{
   const good={model:"fixture",max_tokens:100,messages:[{role:"user",content:"hello"}]};

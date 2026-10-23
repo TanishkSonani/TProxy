@@ -18,6 +18,24 @@ test("metrics filters apply to aggregates and history with inclusive start, excl
     expect(result.availableModels).toEqual(["model-a","model-b"]);expect(JSON.stringify(store.recent())).not.toContain("private prompt");
   } finally {store.close();}
 });
+test("yearly activity honors its range and filters while reporting retained-history coverage",async()=>{
+  const listener=Bun.listen({hostname:"127.0.0.1",port:0,socket:{data(){}}}),port=listener.port;listener.stop(true);
+  const now=Date.now(),from=now-15*86400000,to=now,inside=now-4*86400000;
+  const auth:any={status:{login:"fixture"},models:async()=>({data:[]}),stop(){}};const store=new MetricsStore(":memory:");
+  for(const row of [
+    {id:"inside",at:inside,model:"fixture-model"},
+    {id:"outside-range",at:now-40*86400000,model:"fixture-model"},
+    {id:"other-model",at:now-3*86400000,model:"other-model"}
+  ])store.add({...row,status:200,latency:10,input:2,output:1,tools:0,session:"fixture"});
+  const proxy=await startProxy(auth,{port,key:"activity-fixture",models:{}},{metrics:store}),base=`http://127.0.0.1:${port}`,headers={Authorization:"Bearer activity-fixture"};
+  try{
+    await proxy.startup;
+    const response=await fetch(`${base}/api/activity?from=${from}&to=${to}&model=fixture-model`,{headers}),activity=await response.json() as any;
+    expect(response.status).toBe(200);expect(activity.days).toBe(365);expect(activity.totals.requests).toBe(1);
+    expect(activity.daily).toHaveLength(1);expect(activity.coverageFrom).toBe(now-40*86400000);
+    expect((await fetch(`${base}/api/activity?from=${to}&to=${from}`,{headers})).status).toBe(400);
+  }finally{proxy.stop();store.close();}
+});
 test("rate-limit observation timestamp changes only when provider headers are received",async()=>{
   let limited=true;const auth:any={get:async()=>({token:"fixture",api:"https://api.individual.githubcopilot.com"})};
   const client=new CopilotClient(auth,(async()=>new Response("{}",{headers:limited?{"x-ratelimit-remaining":"4"}:{}})) as unknown as typeof fetch);
@@ -55,4 +73,34 @@ test("dashboard uses same-origin HttpOnly sessions and keeps management protecte
     expect((await fetch(base+"/api/status")).status).toBe(401);expect((await fetch(base+"/api/summary",{headers})).status).toBe(200);
     response=await fetch(base+"/api/settings",{method:"POST",headers,body:JSON.stringify({...settings,models:{}})});expect(response.status).toBe(400);
   }finally{proxy.stop();store.close();}
+});
+
+test("local health and dashboard remain available when TLS blocks auth initialization",async()=>{
+  const listener=Bun.listen({hostname:"127.0.0.1",port:0,socket:{data(){}}}),port=listener.port;listener.stop(true);
+  const auth:any={status:{storage:"fixture",refreshEvents:[]},initialize:async()=>{throw new Error("unable to get local issuer certificate");},models:async()=>({data:[]}),stop(){}};
+  const proxy=await startProxy(auth,{port,key:"tls-fixture",models:{}},{initializeAuth:()=>auth.initialize()}),base=`http://127.0.0.1:${port}`;
+  try{
+    await proxy.startup;
+    const health=await fetch(base+"/health");expect(health.status).toBe(200);expect(await health.json()).toEqual({status:"ok",service:"tproxy"});
+    const dashboard=await fetch(base+"/");expect(dashboard.status).toBe(200);
+    const response=await fetch(base+"/api/status",{headers:{Authorization:"Bearer tls-fixture"}}),status=await response.json() as any;
+    expect(status.startup.auth.state).toBe("error");expect(status.startup.auth.message).toContain("tls.caFile");expect(status.startup.catalog.state).toBe("waiting");
+  }finally{proxy.stop();}
+});
+
+test("model discovery reports TLS failure and recovers through dashboard refresh",async()=>{
+  const listener=Bun.listen({hostname:"127.0.0.1",port:0,socket:{data(){}}}),port=listener.port;listener.stop(true);
+  let fail=true;const auth:any={status:{source:"fixture",storage:"fixture",refreshEvents:[]},initialize:async()=>{},models:async()=>{if(fail)throw new Error("unable to get local issuer certificate");return {data:[]};},account:async()=>{},stop(){}};
+  const proxy=await startProxy(auth,{port,key:"catalog-fixture",models:{}},{initializeAuth:()=>auth.initialize()}),base=`http://127.0.0.1:${port}`,headers={Authorization:"Bearer catalog-fixture"};
+  try{
+    await proxy.startup;
+    let status=await(await fetch(base+"/api/status",{headers})).json() as any;
+    expect(status.startup.auth.state).toBe("ready");expect(status.startup.catalog.state).toBe("error");expect(status.startup.catalog.message).toContain("tls.caFile");
+    expect((await fetch(base+"/api/refresh",{method:"POST",headers})).status).toBe(502);
+    status=await(await fetch(base+"/api/status",{headers})).json() as any;
+    expect(status.startup.auth.state).toBe("ready");expect(status.startup.catalog.state).toBe("error");
+    fail=false;expect((await fetch(base+"/api/refresh",{method:"POST",headers})).status).toBe(200);
+    status=await(await fetch(base+"/api/status",{headers})).json() as any;
+    expect(status.startup.catalog.state).toBe("ready");expect(status.startup.catalog.message).toBeUndefined();
+  }finally{proxy.stop();}
 });

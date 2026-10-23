@@ -1,5 +1,7 @@
 # TProxy
 
+Current version: **1.0.0**, the environment-trust architecture release. Compatibility remains a preview within the tested scope below.
+
 A local gateway that connects your installed Claude Code CLI to models available through your GitHub Copilot account. Claude models use Copilot's native Messages endpoint; other models use Responses or Chat Completions adapters. An offline dashboard stores usage in local SQLite.
 
 **Preview:** tested on Windows with Copilot Free and Auto. Paid, business and enterprise accounts use discovered endpoints and account entitlements, but have not been verified live. Full Anthropic feature parity is not guaranteed. See [known limitations](docs/LIMITATIONS.md).
@@ -102,6 +104,8 @@ Context limits come from Copilot model metadata. `contextFallbackTokens` applies
 
 Prerequisites: Bun; Python for generated Windows icons and research checks; installed .NET Framework compiler for the Windows desktop controller.
 
+The real TLS fixture also uses OpenSSL when it is on PATH; that check is skipped when OpenSSL is unavailable.
+
 ```powershell
 bun install --frozen-lockfile
 bun test
@@ -113,6 +117,7 @@ bun run package:windows
 
 - `build`: host CLI executable with embedded dashboard and license notices.
 - `package:windows`: portable six-file utility under `dist/TProxy`.
+- `TPROXY_BUILD_DIR=dist/<staging-name>` selects a separate staging directory for builds and packaging; output is restricted to the repository's `dist` tree.
 - `build:all`: Windows x64, macOS arm64/x64 and Linux arm64/x64 executables. Only Windows has been tested live.
 - Source execution: `bun run build:ui`, then `bun run start` and `bun run claude` in separate terminals.
 
@@ -125,5 +130,7 @@ Source lives in `src/`, dashboard code in `dashboard/`, regression tests in `tes
 TProxy binds to localhost and adds no third-party telemetry or dashboard CDN calls. Model requests go to GitHub/Copilot; authentication also contacts GitHub. Metrics remain local in SQLite WAL with redacted request content. Dashboard management requires a private authenticated link/session or proxy key.
 
 This is not a guarantee about network activity from Claude Code, hooks, MCP servers or tools. See [limitations](docs/LIMITATIONS.md), the [protocol notes](PROTOCOL.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+The [architecture](docs/ARCHITECTURE.md) explains trust boundaries, environment-provided CAs, local-first startup, Windows deployment and the distinction between implemented behavior and remaining network-policy work.
 
 **Unsupported by GitHub and Anthropic.** Use may violate Copilot terms or corporate policy, may be audit-logged and may risk seat enforcement. Keep usage interactive and low-volume. TProxy does not bypass account entitlements or organizational policy.

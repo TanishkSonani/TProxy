@@ -179,12 +179,15 @@ summary {cursor:pointer;font-size:12px;color:#c6b5df}
 .chart-data {margin-top:13px}
 .chart-data>summary {font-size:12px;color:#b8a9cc;width:fit-content}
 .chart-data-scroll {max-height:260px;overflow:auto;margin-top:15px}
-.activity-map {width:fit-content;min-width:min(100%,340px);max-width:100%}
+.activity-map {width:100%;min-width:0;max-width:100%}
+.heatmap-scroll {display:flex;gap:10px;overflow-x:auto;padding:4px 0 12px;width:100%}
+.heatmap-content {display:grid;gap:4px;width:max-content;flex-shrink:0}
+.heatmap-months {display:grid;grid-auto-columns:12px;gap:4px;align-items:end;height:16px;color:#aaa0b7;font-size:10px;line-height:12px;white-space:nowrap}
 .heatmap {display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,12px);grid-auto-columns:12px;gap:4px;width:max-content;flex-shrink:0}
-.heatmap-scroll {display:flex;gap:10px;overflow-x:auto;padding:4px 0 12px}
-.heatmap-weekdays {display:grid;grid-template-rows:repeat(7,12px);gap:4px;color:#aaa0b7;font-size:12px;line-height:12px;flex-shrink:0}
+.heatmap-weekdays {display:grid;grid-template-rows:repeat(7,12px);gap:4px;margin-top:20px;color:#aaa0b7;font-size:12px;line-height:12px;flex-shrink:0}
 .heat,.heat-placeholder {display:inline-block;width:12px;height:12px;flex-shrink:0;border-radius:2px}
 .heat {border:1px solid #ffffff08}
+.heat-unknown {background:#17181e;border:1px dashed #514762}
 .level-0 {background:#292630}
 .level-1 {background:#473657}
 .level-2 {background:#70558a}

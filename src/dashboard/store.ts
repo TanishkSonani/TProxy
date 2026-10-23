@@ -53,7 +53,10 @@ export class MetricsStore {
     const percentile=(p:number)=>latencies.length?latencies[Math.max(0,Math.ceil(latencies.length*p)-1)].latency:null;
     const sessions=this.db.query(`SELECT COUNT(*) count,AVG(n) averageRequests,AVG(duration) averageDurationMs FROM (SELECT COUNT(*) n,MAX(at)-MIN(at) duration FROM requests ${where}${where?" AND":" WHERE"} session<>'' GROUP BY session)`).get(...params);
     const availableModels=this.db.query("SELECT DISTINCT model FROM requests ORDER BY model").all() as {model:string}[];
-    return {totals:{...totals,errorRate:totals.requests?totals.errors/totals.requests:0,toolRatio:totals.requests?totals.toolRequests/totals.requests:0,p50:percentile(.5),p95:percentile(.95)},models,daily,sessions,days,availableModels:availableModels.map(m=>m.model),driver:this.driver};
+    // Earliest stored record, not the first result of the current model/status filter.
+    // This is not proof of continuous service uptime or a retention-policy boundary.
+    const coverage=this.db.query("SELECT MIN(at) coverageFrom FROM requests").get() as {coverageFrom:number|null};
+    return {totals:{...totals,errorRate:totals.requests?totals.errors/totals.requests:0,toolRatio:totals.requests?totals.toolRequests/totals.requests:0,p50:percentile(.5),p95:percentile(.95)},models,daily,sessions,days,coverageFrom:coverage.coverageFrom,availableModels:availableModels.map(m=>m.model),driver:this.driver};
   }
   close(){this.db.close();}
 }

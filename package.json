@@ -1,11 +1,11 @@
 {
   "name": "tproxy",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun src/cli.ts start",
-    "claude": "bun src/cli.ts claude",
+    "start": "bun --use-system-ca src/cli.ts start",
+    "claude": "bun --use-system-ca src/cli.ts claude",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:ui": "playwright test",

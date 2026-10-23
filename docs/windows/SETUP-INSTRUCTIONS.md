@@ -26,8 +26,8 @@ It uses the normal Windows PowerShell and .NET Framework desktop components supp
    tproxy setup
    ```
 
-   This creates the **TProxy** desktop shortcut and a per-user login shortcut for the status monitor. It does not change registry settings, permanent environment variables, firewall settings, machine services, or Claude permissions.
-4. Alternatively, double-click `tproxy-desktop.exe` to open the controls without registering shortcuts.
+   This creates the **TProxy** desktop shortcut and a per-user login shortcut for the status monitor. Setup always targets the complete package at `%LOCALAPPDATA%\Programs\TProxy`, including its `icons` folder, even if the command was launched from another copy. If that install is incomplete, extract the full package there and run setup again. It does not change registry settings, permanent environment variables, firewall settings, machine services, or Claude permissions.
+4. Alternatively, double-click `tproxy-desktop.exe` in the installed folder to open the controls without registering shortcuts. Controls launched from another copy still use the canonical install's CLI and icons.
 
 If corporate policy blocks unsigned executables, Windows scripting/shortcut COM components, or startup programs, contact your administrator. Do not disable those protections. The CLI can still be used where permitted. A blocked login shortcut means you should open TProxy once after signing into Windows to start its monitor.
 
@@ -50,6 +50,22 @@ The login shortcut starts the monitor only. The proxy does not automatically sta
 4. Keep dashboard links and `tproxy env` output private: both provide local access credentials.
 
 The bare `http://127.0.0.1:4141` page does not grant management access. To get a private link from the terminal, run `tproxy dashboard`.
+
+### Enterprise TLS certificate authority
+
+The updated build enables the runtime's system-CA option at process startup, using Windows' established trust alongside bundled public roots. An already-provisioned corporate machine should not need a manually exported company certificate. Source launches through `bun run start` and `bun run claude` enable the same option. Setting it inside an already-running application does not update that process's trust.
+
+If GitHub/Copilot requests still fail with `unable to get local issuer certificate`, the local listener and dashboard can remain available while upstream access is unavailable. Check whether the required CA is trusted in the environment hosting TProxy. If an additional bundle is needed, obtain an approved **root/intermediate CA certificate in PEM format** through your organization's trusted channel; do not use a server/leaf certificate or an unverified download. Add the CA bundle path to the existing `%LOCALAPPDATA%\TProxy\config.json` without replacing other settings:
+
+```json
+{
+  "tls": {
+    "caFile": "C:\\Users\\you\\Documents\\organization-ca.pem"
+  }
+}
+```
+
+The configured CA is added to Bun's default trust roots; certificate-chain and hostname verification stay enabled. Restart only after finishing active sessions. Alternatively, set `TPROXY_CA_FILE` in the environment inherited by TProxy. Never set a TLS verification-disable option. The dashboard's startup status distinguishes a healthy local listener from a failed Copilot connection.
 
 ## 4. Launch Claude without permanent environment changes
 
@@ -120,6 +136,7 @@ When updating an existing TProxy installation, close its controller with `tproxy
 - **Grey icon but server was started:** wait a few seconds and reopen TProxy. Inspect `%LOCALAPPDATA%\TProxy\desktop.log`. The monitor must be running for automatic icon changes.
 - **Port in use:** do not kill an unrelated program. Choose another port in the TProxy config and restart.
 - **GitHub login unavailable:** confirm the working VS Code account. Custom/portable VS Code storage can be configured with explicit paths. Free/paid/enterprise access follows the account's actual entitlements.
+- **`unable to get local issuer certificate`:** ask IT for the approved PEM CA bundle and configure `tls.caFile` as described above. Do not disable certificate validation. `/health` confirms only that the local listener is running; check the dashboard's upstream startup status for Copilot readiness.
 - **Safety classifier unavailable:** inspect the native Claude classifier diagnostic and TProxy's recent request errors. The known Responses stop-sequence bug is fixed; outages/quota/revocation can still prevent classification. Safety checks are not bypassed.
 - **Managed routing conflict:** follow the named policy/settings error and contact the administrator where required. TProxy does not modify corporate policy.
 - **Long context/model change:** restart through `tproxy claude` to rediscover limits. Cross-model encrypted reasoning and future Auto selections may require native compaction or a new conversation.

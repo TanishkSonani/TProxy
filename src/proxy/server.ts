@@ -14,23 +14,52 @@ import {stopSequences} from "./stop-sequences";
 import {contextPolicy,modelContext} from "../client/context-window";
 import {readJSON,validateMessages} from "./validate";
 
-export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number;contextWindowTokens?:number;contextFallbackTokens?:number};
+export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number;contextWindowTokens?:number;contextFallbackTokens?:number;tls?:{caFile?:string}};
 export type RequestRecord={id:string;at:number;model:string;status:number;latency:number;input:number;output:number;tools:number;session:string;estimated?:boolean;body?:unknown;cacheRead?:number;cacheWrite?:number};
 type AutoSelection={model:any;token:string;expires:number};
-export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{client?:CopilotClient;record?:(row:RequestRecord)=>void;onStop?:()=>void;metrics?:MetricsStore;saveSettings?:(settings:{port:number;models:Record<string,string>;retentionDays:number;requireApiKey:boolean})=>void}={}) {
+type StartupState={state:"starting"|"ready"|"needs_auth"|"waiting"|"loading"|"error";message?:string;updatedAt?:number};
+function startupMessage(error:unknown){
+  const message=error instanceof Error?error.message:"Unknown upstream startup failure";
+  if(/certificate|TLS CA|CERT_|ERR_TLS_|SSL_/i.test(message))
+    return "TLS certificate verification or CA configuration failed. Check the host's approved system trust or configure tls.caFile with an approved PEM CA bundle; certificate and hostname checks stay enabled.";
+  if(message.startsWith("AUTH_REQUIRED"))return "No reusable GitHub login was found. Connect GitHub from the dashboard.";
+  if(/credential was rejected|token exchange rejected \((401|403)\)/i.test(message))return "GitHub rejected the selected credential. Reconnect that account or check its access.";
+  return "Upstream initialization failed. Check connectivity, proxy configuration and account access, then retry.";
+}
+export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{client?:CopilotClient;transport?:typeof fetch;initializeAuth?:()=>Promise<unknown>;record?:(row:RequestRecord)=>void;onStop?:()=>void;metrics?:MetricsStore;saveSettings?:(settings:{port:number;models:Record<string,string>;retentionDays:number;requireApiKey:boolean})=>void}={}) {
   if(!Number.isInteger(config.port)||config.port<1||config.port>65535||!config.key)throw new Error("Invalid proxy configuration");
-  const client=options.client??new CopilotClient(auth);let catalog:any;
-  try{catalog=await auth.models();}catch(error){if(!(error instanceof Error)||!error.message.startsWith("AUTH_REQUIRED"))throw error;catalog={data:[]};}
-  let modelMap=new Map<string,any>((catalog.data??[]).map((m:any)=>[m.id,m]));
+  const client=options.client??new CopilotClient(auth,options.transport);let catalog:any={data:[]};
+  let modelMap=new Map<string,any>(),catalogAt=0;
+  let authStartup:StartupState={state:options.initializeAuth?"starting":"ready"},catalogStartup:StartupState={state:"waiting"};
+  let catalogInflight:Promise<void>|undefined;
+  async function refreshCatalog(){
+    if(catalogInflight)return catalogInflight;
+    catalogStartup={state:"loading"};
+    catalogInflight=(async()=>{
+      try{catalog=await auth.models();modelMap=new Map((catalog.data??[]).map((m:any)=>[m.id,m]));catalogAt=Date.now();catalogStartup={state:"ready",updatedAt:catalogAt};}
+      catch(error){catalogStartup={state:"error",message:startupMessage(error)};throw error;}
+    })();
+    try{await catalogInflight;}finally{catalogInflight=undefined;}
+  }
+  async function initializeUpstream(){
+    if(options.initializeAuth){
+      authStartup={state:"starting"};
+      try{await options.initializeAuth();authStartup={state:auth.status.source?"ready":"needs_auth",...(auth.status.source?{}:{message:"Connect GitHub from the dashboard to authenticate."})};}
+      catch(error){authStartup=error instanceof Error&&error.message.startsWith("AUTH_REQUIRED")?{state:"needs_auth",message:startupMessage(error)}:{state:"error",message:startupMessage(error)};catalogStartup={state:"waiting"};return;}
+      if(authStartup.state==="needs_auth")return;
+    }
+    try{await refreshCatalog();}catch{}
+  }
+  let startup:Promise<void>;
   const selections=new Map<string,AutoSelection>(),selectionInflight=new Map<string,Promise<AutoSelection>>();
-  let catalogAt=Date.now(),autoContextAt=0,autoContext:AutoSelection|undefined,contextInflight:Promise<void>|undefined;
+  let autoContextAt=0,autoContext:AutoSelection|undefined,contextInflight:Promise<void>|undefined;
   const context= (mapping=config.models)=>({...contextPolicy(modelMap.values(),mapping,config.contextWindowTokens,[...(autoContext&&autoContext.expires>Date.now()+30000&&Date.now()-autoContextAt<300000?[autoContext.model]:[]),...[...selections.values()].filter(s=>s.expires>Date.now()+30000).map(s=>s.model)],config.contextFallbackTokens),fetchedAt:catalogAt,autoDiscoveredAt:autoContextAt||null});
   const autoReady=()=>autoContext&&autoContext.expires>Date.now()+30000&&Date.now()-autoContextAt<300000;
   const hydrate=(model:any)=>{const base=modelMap.get(model.id);return {...base,...model,capabilities:{...base?.capabilities,...model.capabilities,limits:{...base?.capabilities?.limits,...model.capabilities?.limits},supports:{...base?.capabilities?.supports,...model.capabilities?.supports}}};};
   async function discoverContext(needsAuto=Object.values(config.models).includes("copilot-auto")){
     if(contextInflight){await contextInflight;if(needsAuto&&!autoReady())return discoverContext(true);return;}
     contextInflight=(async()=>{
-      catalog=await auth.models();modelMap=new Map((catalog.data??[]).map((m:any)=>[m.id,m]));catalogAt=Date.now();
+      await refreshCatalog();
       if(needsAuto&&!autoReady()){
         const result=await client.json("/auto",{prompt:"Determine the model for an interactive coding session",tier:"balance"},{"X-Initiator":"user"},AbortSignal.timeout(20000));
         if(typeof result.selected_model?.id!=="string"||!result.selected_model.id||typeof result.session_token!=="string"||!result.session_token||!Number.isFinite(Number(result.expires_at))||Number(result.expires_at)*1000<=Date.now()+30000)throw new ApiError(502,"api_error","Provider Auto discovery was invalid");
@@ -47,7 +76,7 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
     const mapped=config.models[payload.model]??payload.model;
     if(mapped!=="copilot-auto"){
       let model=modelMap.get(mapped);
-      if(!model||Date.now()-catalogAt>300000){catalog=await auth.models();modelMap=new Map((catalog.data??[]).map((m:any)=>[m.id,m]));catalogAt=Date.now();model=modelMap.get(mapped);}
+      if(!model||Date.now()-catalogAt>300000){await refreshCatalog();model=modelMap.get(mapped);}
       if(!model||model.policy?.state==="disabled")throw new ApiError(400,"invalid_request_error","The selected model is unavailable for this account");
       return {model,token:undefined,session:sessionKey(payload)};
     }
@@ -89,29 +118,36 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
         if(url.pathname.startsWith("/api/")){
           const json=(value:any)=>Response.json(value,{headers:{"cache-control":"no-store"}});
           if(url.pathname==="/api/dashboard-link")return json({url:`http://127.0.0.1:${config.port}/#session=${dashboardKey}`});
-          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:context().tokens,context:context(),auth:auth.status,device:deviceState,limits:client.observedLimits,limitsObservedAt:client.limitsObservedAt??null,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
+          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:context().tokens,context:context(),auth:auth.status,startup:{auth:authStartup,catalog:catalogStartup},device:deviceState,limits:client.observedLimits,limitsObservedAt:client.limitsObservedAt??null,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
           if(url.pathname==="/api/context"&&request.method==="POST"){
             const input=await readJSON(request,65536);if(!input||typeof input!=="object"||Array.isArray(input)||(input.model!==undefined&&typeof input.model!=="string"))throw new ApiError(400,"invalid_request_error","Context options must be an object with an optional model string");
             const mapping=input?.model?{...config.models,default:config.models[input.model]??input.model}:config.models;
             await discoverContext(Object.values(mapping).includes("copilot-auto"));return json(context(mapping));
           }
-          if(url.pathname==="/api/summary"||url.pathname==="/api/logs"){
+          if(url.pathname==="/api/summary"||url.pathname==="/api/logs"||url.pathname==="/api/activity"){
             const filter:MetricsFilter={};
             for(const key of ["from","to"] as const){const value=url.searchParams.get(key);if(value!==null){const n=Number(value);if(!/^\d+$/.test(value)||!Number.isSafeInteger(n)||n>8640000000000000)throw new ApiError(400,"invalid_request_error","Invalid date range");filter[key]=n;}}
             if(filter.from!==undefined&&filter.to!==undefined&&(filter.from>=filter.to||filter.to-filter.from>3660*86400000))throw new ApiError(400,"invalid_request_error","Invalid date range");
             const model=url.searchParams.get("model"),status=url.searchParams.get("status");
             if(model){if(model.length>200)throw new ApiError(400,"invalid_request_error","Invalid model filter");filter.model=model;}
             if(status){if(!["success","error","429"].includes(status))throw new ApiError(400,"invalid_request_error","Invalid status filter");filter.status=status as MetricsFilter["status"];}
-            return url.pathname==="/api/summary"?json(options.metrics?.summary(90,Date.now(),filter)??null):json({requests:options.metrics?.recent(200,0,filter)??[],events:options.metrics?.events()??[],limit:200});
+            return url.pathname==="/api/summary"?json(options.metrics?.summary(90,Date.now(),filter)??null):url.pathname==="/api/activity"?json(options.metrics?.summary(365,Date.now(),filter)??null):json({requests:options.metrics?.recent(200,0,filter)??[],events:options.metrics?.events()??[],limit:200});
           }
           if(url.pathname==="/api/catalog")return json([...modelMap.values()].map(m=>({id:m.id,name:m.name,vendor:m.vendor,policy:m.policy,picker:m.model_picker_enabled,endpoints:m.supported_endpoints,limits:m.capabilities?.limits})));
-          if(url.pathname==="/api/refresh"&&request.method==="POST"){await auth.account();return json(auth.status);}
+          if(url.pathname==="/api/refresh"&&request.method==="POST"){
+            try{
+              if(typeof (auth as any).initialize==="function"){authStartup={state:"starting"};await auth.initialize();authStartup={state:auth.status.source?"ready":"needs_auth"};}
+              else await auth.account();
+            }catch(error){authStartup=error instanceof Error&&error.message.startsWith("AUTH_REQUIRED")?{state:"needs_auth",message:startupMessage(error)}:{state:"error",message:startupMessage(error)};throw error;}
+            await refreshCatalog();
+            return json(auth.status);
+          }
           if(url.pathname==="/api/auth/start"&&request.method==="POST"){
             if(auth.status.source)throw new ApiError(409,"invalid_request_error","An existing GitHub credential is already selected");
             if(deviceState?.state==="pending")return json(deviceState);
-            const flow=new DeviceFlow(auth.status.host??"github.com"),code=await flow.start();deviceAbort=new AbortController();
+            const flow=new DeviceFlow(auth.status.host??"github.com",options.transport),code=await flow.start();deviceAbort=new AbortController();
             deviceState={state:"pending",url:code.verification_uri,code:code.user_code,expiresAt:Date.now()+code.expires_in*1000};
-            void flow.poll(code,{signal:deviceAbort.signal}).then(async credential=>{await auth.useCredential(credential);catalog=await auth.models();modelMap=new Map((catalog.data??[]).map((m:any)=>[m.id,m]));deviceState={state:"complete"};}).catch(()=>{deviceState={state:"failed"};});
+            void flow.poll(code,{signal:deviceAbort.signal}).then(async credential=>{await auth.useCredential(credential);authStartup={state:"ready"};deviceState={state:"complete"};void refreshCatalog().catch(()=>{});}).catch(error=>{authStartup={state:"error",message:startupMessage(error)};deviceState={state:"failed"};});
             return json(deviceState);
           }
           if(url.pathname==="/api/env"){
@@ -194,5 +230,6 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
       } catch(error){const response=errorResponse(error,id);record(null,request.signal.aborted?499:response.status);return response;}
       finally{if(!streaming){abort();request.signal.removeEventListener("abort",abort);}}
     }});
-  return {server,client,config,dashboardURL:`http://127.0.0.1:${config.port}/#session=${dashboardKey}`,stop(){deviceAbort?.abort();server.stop(true);auth.stop();}};
+  startup=initializeUpstream();
+  return {server,client,config,startup,dashboardURL:`http://127.0.0.1:${config.port}/#session=${dashboardKey}`,stop(){deviceAbort?.abort();server.stop(true);auth.stop();}};
 }

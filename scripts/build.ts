@@ -1,10 +1,11 @@
 import {mkdirSync,readdirSync,readFileSync,statSync,writeFileSync,existsSync} from "node:fs";
-import {resolve,join} from "node:path";
+import {resolve,join,sep} from "node:path";
 import {createHash} from "node:crypto";
-const root=resolve(import.meta.dir,".."),output=join(root,"dist"),web=join(output,"dashboard");
+const root=resolve(import.meta.dir,".."),distRoot=join(root,"dist"),output=resolve(root,process.env.TPROXY_BUILD_DIR??"dist"),web=join(output,"dashboard");
+if(output!==distRoot&&!output.startsWith(distRoot+sep))throw new Error("Build output must stay within the repository's dist directory");
 process.chdir(root);
 const run=async(args:string[])=>{const child=Bun.spawn(args,{stdout:"inherit",stderr:"inherit",windowsHide:true});if(await child.exited!==0)throw new Error("Build command failed");};
-await run([process.execPath,"run","build:ui"]);mkdirSync(output,{recursive:true});
+await run([process.execPath,"run","build:ui","--outDir",web]);mkdirSync(output,{recursive:true});
 const files=["index.html",...readdirSync(join(web,"assets")).map(f=>`assets/${f}`)];
 const assets=Object.fromEntries(files.map(file=>[file==="index.html"?"/":`/${file}`,{data:readFileSync(join(web,file)).toString("base64"),type:file.endsWith(".html")?"text/html; charset=utf-8":file.endsWith(".css")?"text/css; charset=utf-8":file.endsWith(".js")?"text/javascript; charset=utf-8":"application/octet-stream"}]));
 const contents=`const assets=${JSON.stringify(assets)};export async function asset(path){const a=assets[path];if(!a)return;return new Response(Buffer.from(a.data,"base64"),{headers:{"content-type":a.type,"cache-control":path==="/"?"no-store":"public, max-age=31536000, immutable"}});}`;
@@ -14,8 +15,8 @@ const allowed=["bun-windows-x64","bun-darwin-arm64","bun-darwin-x64","bun-linux-
 const requested=process.argv.slice(2),targets=requested.includes("--all")?allowed:requested.length?requested:[`bun-${process.platform==="win32"?"windows":process.platform}-${process.arch}`];
 const checksums:string[]=[];
 for(const target of targets){if(!allowed.includes(target))throw new Error("Unsupported compile target");const suffix=target.slice(4),name=`tproxy-${suffix}${suffix.startsWith("windows")?".exe":""}`,file=join(output,name);
-  const icon=join(output,"TProxy/icons/tproxy-off.ico"),branding=target.includes("windows")?["--windows-title=TProxy","--windows-description=TProxy local Copilot gateway","--windows-version=0.2.1.0",...(existsSync(icon)?[`--windows-icon=${icon}`]:[])]:[];
-  await run([process.execPath,"build",join(output,"staging/cli.js"),"--compile",`--target=${target}`,`--outfile=${file}`,"--no-compile-autoload-dotenv","--no-compile-autoload-bunfig","--no-compile-autoload-tsconfig","--no-compile-autoload-package-json",...branding]);
+  const icon=join(output,"TProxy/icons/tproxy-off.ico"),branding=target.includes("windows")?["--windows-title=TProxy","--windows-description=TProxy local Copilot gateway","--windows-version=1.0.0.0",...(existsSync(icon)?[`--windows-icon=${icon}`]:[])]:[];
+  await run([process.execPath,"build",join(output,"staging/cli.js"),"--compile","--compile-exec-argv=--use-system-ca",`--target=${target}`,`--outfile=${file}`,"--no-compile-autoload-dotenv","--no-compile-autoload-bunfig","--no-compile-autoload-tsconfig","--no-compile-autoload-package-json",...branding]);
   checksums.push(`${createHash("sha256").update(readFileSync(file)).digest("hex")}  ${name}`);console.log(`${name}: ${Math.round(statSync(file).size/1024/1024)} MiB`);
 }
 writeFileSync(join(output,"SHA256SUMS.txt"),checksums.join("\n")+"\n");
