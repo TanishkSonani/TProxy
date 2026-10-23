@@ -44,7 +44,7 @@ Example configuration; every auth override is optional:
 {
   "port": 4141,
   "retentionDays": 90,
-  "contextWindowTokens": 200000,
+  "contextFallbackTokens": 200000,
   "requireApiKey": true,
   "models": {"default":"copilot-auto","sonnet":"copilot-auto","opus":"copilot-auto","haiku":"copilot-auto"},
   "auth": {
@@ -59,7 +59,7 @@ Example configuration; every auth override is optional:
 
 `GHCP_COPILOT_PATH`, `GHCP_VSCODE_PATH`, `VSCODE_EXTENSIONS` and `VSCODE_PORTABLE` are also supported. Remote/WSL credentials must be accessed where the bridge runs; it does not inspect another machine automatically. Arbitrary undiscoverable locations require an explicit path.
 
-The launcher explicitly caps the client context window at 200k by default and lowers it for smaller advertised limits among configured/selectable models or observed Auto selections. Set `contextWindowTokens` to a smaller ceiling when needed. It keeps proactive compaction enabled and reports actual usage without multipliers. Relaunch Claude to apply a changed ceiling; already-running processes keep their launch settings. Unknown future Auto/manual model switches and oversized tool results still require the native prompt-too-long recovery path. See [context guard verification](evidence/CONTEXT-WINDOW.md).
+The launcher fetches fresh Copilot `/models` metadata and resolves `/auto` when an Auto slot is used. The client window comes from the applicable per-model prompt/total limits, including a CLI `--model` selection. There is no default 200k cap. `contextFallbackTokens` is used only when Copilot omits limits and is explicitly labeled as fallback; optional `contextWindowTokens` adds a user ceiling. It keeps proactive compaction enabled and reports actual usage without multipliers. Relaunch Claude to apply discovery; existing processes keep their launch settings. Auto discovery is a metadata probe, not a guarantee that every subsequent prompt selects the same model. Future Auto/manual switches and oversized tool results still need the native prompt-too-long recovery path. See [context verification](evidence/CONTEXT-WINDOW.md).
 
 ## Dashboard
 

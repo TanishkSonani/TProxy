@@ -11,9 +11,9 @@ import { claudeEnvironment } from "../client/claude-launch";
 import { generateEnvScript } from "../client/env-script";
 import { DeviceFlow } from "../auth/device-flow";
 import {stopSequences} from "./stop-sequences";
-import {clientContextWindow} from "../client/context-window";
+import {contextPolicy,modelContext} from "../client/context-window";
 
-export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number;contextWindowTokens?:number};
+export type ProxyConfig={port:number;key:string;models:Record<string,string>;claudeMin?:number;claudeMax?:number;requireApiKey?:boolean;retentionDays?:number;contextWindowTokens?:number;contextFallbackTokens?:number};
 export type RequestRecord={id:string;at:number;model:string;status:number;latency:number;input:number;output:number;tools:number;session:string;estimated?:boolean;body?:unknown;cacheRead?:number;cacheWrite?:number};
 type AutoSelection={model:any;token:string;expires:number};
 export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{client?:CopilotClient;record?:(row:RequestRecord)=>void;onStop?:()=>void;metrics?:MetricsStore;saveSettings?:(settings:{port:number;models:Record<string,string>;retentionDays:number;requireApiKey:boolean})=>void}={}) {
@@ -22,7 +22,19 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
   try{catalog=await auth.models();}catch(error){if(!(error instanceof Error)||!error.message.startsWith("AUTH_REQUIRED"))throw error;catalog={data:[]};}
   let modelMap=new Map<string,any>((catalog.data??[]).map((m:any)=>[m.id,m]));
   const selections=new Map<string,AutoSelection>(),selectionInflight=new Map<string,Promise<AutoSelection>>();
-  const contextWindow=()=>clientContextWindow(modelMap.values(),config.models,config.contextWindowTokens,[...selections.values()].map(s=>s.model));
+  let catalogAt=Date.now(),autoContextAt=0,autoContext:AutoSelection|undefined,contextInflight:Promise<void>|undefined;
+  const context= (mapping=config.models)=>({...contextPolicy(modelMap.values(),mapping,config.contextWindowTokens,[...(autoContext&&autoContext.expires>Date.now()+30000&&Date.now()-autoContextAt<300000?[autoContext.model]:[]),...[...selections.values()].filter(s=>s.expires>Date.now()+30000).map(s=>s.model)],config.contextFallbackTokens),fetchedAt:catalogAt,autoDiscoveredAt:autoContextAt||null});
+  async function discoverContext(needsAuto=Object.values(config.models).includes("copilot-auto")){
+    if(contextInflight)return contextInflight;
+    contextInflight=(async()=>{
+      catalog=await auth.models();modelMap=new Map((catalog.data??[]).map((m:any)=>[m.id,m]));catalogAt=Date.now();
+      if(needsAuto&&(!autoContext||autoContext.expires<=Date.now()+30000||Date.now()-autoContextAt>=300000)){
+        const result=await client.json("/auto",{prompt:"Determine the model for an interactive coding session",tier:"balance"},{"X-Initiator":"user"});
+        if(!result.selected_model?.id||typeof result.session_token!=="string"||!Number.isFinite(Number(result.expires_at)))throw new ApiError(502,"api_error","Provider Auto discovery was invalid");
+        autoContext={model:result.selected_model,token:result.session_token,expires:Number(result.expires_at)*1000};autoContextAt=Date.now();
+      }
+    })();try{await contextInflight;}finally{contextInflight=undefined;}
+  }
   const dashboardKey=randomUUID()+randomUUID(),booted=Date.now();
   let pendingPort=config.port,metricsError=false;
   let deviceState:any=null,deviceAbort:AbortController|undefined;
@@ -69,10 +81,15 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
         if(!authenticated && (config.requireApiKey!==false||url.pathname.startsWith("/api/")))throw new ApiError(401,"authentication_error","Invalid local proxy credential");
         if(url.pathname.startsWith("/api/")){
           const json=(value:any)=>Response.json(value,{headers:{"cache-control":"no-store"}});
-          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:contextWindow(),auth:auth.status,device:deviceState,limits:client.observedLimits,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
+          if(url.pathname==="/api/status")return json({running:true,port:config.port,uptimeMs:Date.now()-booted,contextWindowTokens:context().tokens,context:context(),auth:auth.status,device:deviceState,limits:client.observedLimits,metrics:{driver:options.metrics?.driver??null,error:metricsError}});
+          if(url.pathname==="/api/context"&&request.method==="POST"){
+            const input=await request.json() as any;if(input?.model!==undefined&&typeof input.model!=="string")throw new ApiError(400,"invalid_request_error","model must be a string");
+            const mapping=input?.model?{...config.models,default:config.models[input.model]??input.model}:config.models;
+            await discoverContext(Object.values(mapping).includes("copilot-auto"));return json(context(mapping));
+          }
           if(url.pathname==="/api/summary")return json(options.metrics?.summary()??null);
           if(url.pathname==="/api/logs")return json({requests:options.metrics?.recent()??[],events:options.metrics?.events()??[]});
-          if(url.pathname==="/api/catalog")return json([...modelMap.values()].map(m=>({id:m.id,name:m.name,vendor:m.vendor,policy:m.policy,picker:m.model_picker_enabled,endpoints:m.supported_endpoints})));
+          if(url.pathname==="/api/catalog")return json([...modelMap.values()].map(m=>({id:m.id,name:m.name,vendor:m.vendor,policy:m.policy,picker:m.model_picker_enabled,endpoints:m.supported_endpoints,limits:m.capabilities?.limits})));
           if(url.pathname==="/api/refresh"&&request.method==="POST"){await auth.account();return json(auth.status);}
           if(url.pathname==="/api/auth/start"&&request.method==="POST"){
             if(auth.status.source)throw new ApiError(409,"invalid_request_error","An existing GitHub credential is already selected");
@@ -83,8 +100,9 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
             return json(deviceState);
           }
           if(url.pathname==="/api/env"){
+            await discoverContext();
             const shell=url.searchParams.get("shell")??"powershell";if(!["powershell","bash","cmd"].includes(shell))throw new ApiError(400,"invalid_request_error","Unknown shell");
-            const env=claudeEnvironment({port:config.port,key:config.key,model:config.models.default,smallModel:config.models.haiku,sonnetModel:config.models.sonnet,opusModel:config.models.opus,contextWindowTokens:contextWindow()},{});env.ANTHROPIC_API_KEY=undefined;env.CLAUDE_CODE_OAUTH_TOKEN=undefined;
+            const env=claudeEnvironment({port:config.port,key:config.key,model:config.models.default,smallModel:config.models.haiku,sonnetModel:config.models.sonnet,opusModel:config.models.opus,contextWindowTokens:context().tokens},{});env.ANTHROPIC_API_KEY=undefined;env.CLAUDE_CODE_OAUTH_TOKEN=undefined;
             return json({script:generateEnvScript(env,shell as "powershell"|"bash"|"cmd")});
           }
           if(url.pathname==="/api/settings"){
@@ -99,8 +117,8 @@ export async function startProxy(auth:TokenManager,config:ProxyConfig,options:{c
           }
         }
         if(url.pathname==="/api/stop"&&request.method==="POST"){setTimeout(()=>{deviceAbort?.abort();auth.stop();server.stop(true);options.onStop?.();},100);return Response.json({stopping:true});}
-        if(url.pathname==="/v1/models"&&request.method==="GET")return Response.json({data:[{id:"copilot-auto",type:"model",display_name:"Copilot Auto",created_at:"2026-10-23T00:00:00Z"},
-          ...[...modelMap.values()].filter((m:any)=>m.policy?.state!=="disabled"&&m.model_picker_enabled).map((m:any)=>({id:m.id,type:"model",display_name:m.name??m.id,created_at:"2026-10-23T00:00:00Z"}))],has_more:false});
+        if(url.pathname==="/v1/models"&&request.method==="GET")return Response.json({data:[{id:"copilot-auto",type:"model",display_name:"Copilot Auto",created_at:"2026-10-23T00:00:00Z",max_input_tokens:autoContext?modelContext(autoContext.model)?.tokens:undefined},
+          ...[...modelMap.values()].filter((m:any)=>m.policy?.state!=="disabled"&&m.model_picker_enabled).map((m:any)=>({id:m.id,type:"model",display_name:m.name??m.id,created_at:"2026-10-23T00:00:00Z",max_input_tokens:modelContext(m)?.tokens,max_tokens:m.vendor==="Anthropic"?Math.min(config.claudeMax??4096,m.capabilities?.limits?.max_output_tokens??4096):m.capabilities?.limits?.max_output_tokens}))],has_more:false});
         if(!["/v1/messages","/v1/messages/count_tokens"].includes(url.pathname)||request.method!=="POST")throw new ApiError(404,"not_found_error","Unknown endpoint");
         const bytes=await request.arrayBuffer();if(bytes.byteLength>32*1024*1024)throw new ApiError(413,"request_too_large","Request exceeds 32 MB");let payload:any;
         try{payload=JSON.parse(new TextDecoder().decode(bytes));}catch{throw new ApiError(400,"invalid_request_error","Request body must be valid JSON");}
