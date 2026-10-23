@@ -64,18 +64,19 @@ export async function vscodeCredential(options: AuthOptions): Promise<Credential
   return null;
 }
 
-export async function existingCredential(options: AuthOptions = {}): Promise<Credential|null> {
-  const host=options.githubHost??process.env.GH_HOST??"github.com";githubApi(host);
-  for(const name of ["GH_TOKEN","GITHUB_TOKEN"])if(process.env[name]?.trim())return {token:process.env[name]!.trim(),source:name,host};
-  if(Bun.which("gh")) {
+export async function existingCredential(options: AuthOptions = {},deps:{env?:NodeJS.ProcessEnv;command?:(args:string[])=>Promise<string|null>;vscode?:(options:AuthOptions)=>Promise<Credential|null>;ghAvailable?:boolean}={}): Promise<Credential|null> {
+  const env=deps.env??process.env,run=deps.command??command;
+  const host=options.githubHost??env.GH_HOST??"github.com";githubApi(host);
+  for(const name of ["GH_TOKEN","GITHUB_TOKEN"])if(env[name]?.trim())return {token:env[name]!.trim(),source:name,host};
+  if(deps.ghAvailable??Boolean(Bun.which("gh"))) {
     let selected=host;
-    if(!options.githubHost && !process.env.GH_HOST) {
-      const status=await command(["gh","auth","status","--json","hosts"]);
+    if(!options.githubHost && !env.GH_HOST) {
+      const status=await run(["gh","auth","status","--json","hosts"]);
       try {const hosts=Object.keys(JSON.parse(status??"{}").hosts??{});if(hosts.length>1)throw new Error("Multiple gh hosts; select githubHost");if(hosts.length===1)selected=hosts[0];}
       catch(error){if(error instanceof Error && error.message.startsWith("Multiple"))throw error;}
     }
-    githubApi(selected);const token=await command(["gh","auth","token","--hostname",selected]);
-    if(token)return {token,source:"gh",host:selected};
+    githubApi(selected);const token=await run(["gh","auth","token","--hostname",selected,...(options.account?["--user",options.account]:[])]);
+    if(token)return {token,source:"gh",host:selected,login:options.account};
   }
-  return vscodeCredential({...options,githubHost:host});
+  return (deps.vscode??vscodeCredential)({...options,githubHost:host});
 }

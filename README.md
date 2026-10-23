@@ -94,6 +94,8 @@ Authentication checks `GH_TOKEN` / `GITHUB_TOKEN`, `gh auth token`, then existin
 
 Custom installations can specify `auth.vscodePaths`, `auth.extensionPaths`, `auth.userDataDirs` and `auth.sharedDataDirs` as path arrays. `auth.githubHost` selects a GitHub host. Remote/WSL credentials must be accessible where TProxy runs. Use separate data directories for separate accounts.
 
+If your Git publishing login differs from your Copilot account, set `auth.account` to the Copilot GitHub login. TProxy asks GitHub CLI for that specific account and falls back to the matching VS Code session when it is absent, without changing your active Git publishing account.
+
 Context limits come from Copilot model metadata. `contextFallbackTokens` applies only when limits are unavailable; optional `contextWindowTokens` imposes a ceiling. Relaunch Claude after changing models or limits.
 
 ## Develop and build

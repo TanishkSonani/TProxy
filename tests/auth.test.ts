@@ -2,7 +2,16 @@ import { expect,test } from "bun:test";
 import { TokenManager,copilotOrigin,CredentialRejected } from "../src/auth/token-manager";
 import { DeviceFlow } from "../src/auth/device-flow";
 import type { SecretStore } from "../src/auth/secure-store";
-import { githubApi } from "../src/auth/providers";
+import { githubApi,existingCredential } from "../src/auth/providers";
+test("pinned Copilot identity does not select the unrelated active Git publishing account",async()=>{
+  const calls:string[][]=[],vscode={token:"vscode-fixture",source:"vscode",host:"github.com",login:"copilot-user"};
+  const credential=await existingCredential({githubHost:"github.com",account:"copilot-user"},{env:{},ghAvailable:true,
+    command:async args=>{calls.push(args);return args.includes("--user")?null:"wrong-active-account-token";},
+    vscode:async options=>{expect(options.account).toBe("copilot-user");return vscode;}});
+  expect(calls).toEqual([["gh","auth","token","--hostname","github.com","--user","copilot-user"]]);expect(credential).toEqual(vscode);
+  const pinned=await existingCredential({githubHost:"github.com",account:"copilot-user"},{env:{},ghAvailable:true,command:async()=>"pinned-gh-fixture",vscode:async()=>{throw new Error("Should not fall through");}});
+  expect(pinned?.source).toBe("gh");expect(pinned?.login).toBe("copilot-user");
+});
 class MemoryStore implements SecretStore {kind="test";value:string|null=null;async read(){return this.value;}async write(value:string){this.value=value;}}
 function harness(){
   let time=1_800_000_000_000,calls=0,fail=false;const store=new MemoryStore();
