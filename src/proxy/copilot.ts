@@ -5,7 +5,9 @@ export class CopilotClient {
   constructor(readonly auth:TokenManager,private transport:typeof fetch=fetch){}
   async request(path:string,body?:any,headers:Record<string,string>={},signal?:AbortSignal):Promise<Response> {
     if(!["/models","/auto","/responses","/chat/completions","/v1/messages","/v1/messages/count_tokens"].includes(path))throw new ApiError(400,"invalid_request_error","Unsupported provider path");
+    let authRetried=false;
     for(let attempt=0;attempt<3;attempt++){
+      signal?.throwIfAborted();
       const token=await this.auth.get();
       const response=await this.transport(token.api+path,{method:body===undefined?"GET":"POST",redirect:"manual",signal:signal?AbortSignal.any([signal,AbortSignal.timeout(300000)]):AbortSignal.timeout(300000),
         headers:{Authorization:`Bearer ${token.token}`,"Content-Type":"application/json",Accept:body?.stream?"text/event-stream":"application/json",
@@ -13,7 +15,7 @@ export class CopilotClient {
           "User-Agent":"GitHubCopilotChat/0.71.0","X-GitHub-Api-Version":"2026-08-01","OpenAI-Intent":"conversation-panel",...headers},
         body:body===undefined?undefined:JSON.stringify(body)});
       for(const [key,value]of response.headers)if(key.startsWith("x-ratelimit-")||key==="retry-after")this.observedLimits[key]=value;
-      if(response.status===401&&attempt===0){await response.body?.cancel();await this.auth.refresh(true);continue;}
+      if(response.status===401&&!authRetried){authRetried=true;await response.body?.cancel();await this.auth.refresh(true);continue;}
       if([500,502,503,504].includes(response.status)&&attempt<2){
         const retry=response.headers.get("retry-after");let delay=retry?Number(retry)*1000:NaN;
         if(!Number.isFinite(delay)&&retry)delay=Date.parse(retry)-Date.now();if(!Number.isFinite(delay))delay=250*2**attempt;

@@ -100,7 +100,7 @@ async function* rawResponsesStream(response:Response,model:string,onComplete:(me
       const end=close(key);if(end)yield end;
     }
     if(event.type==="response.output_item.done"){
-      if(item.type==="function_call") {const key="tool:"+index;const b=blocks.get(key);if(b&&!b.delta&&item.arguments)yield frame({type:"content_block_delta",index:b.index,delta:{type:"input_json_delta",partial_json:item.arguments}});const end=close(key);if(end)yield end;}
+      if(item.type==="function_call") {try{JSON.parse(item.arguments);}catch{throw new ApiError(502,"api_error","Provider returned invalid tool arguments");}const key="tool:"+index;const b=blocks.get(key);if(b&&!b.delta&&item.arguments)yield frame({type:"content_block_delta",index:b.index,delta:{type:"input_json_delta",partial_json:item.arguments}});const end=close(key);if(end)yield end;}
       if(item.type==="reasoning") {const key="reason:"+index;if(!blocks.has(key))yield open(key,{type:"thinking",thinking:"",signature:""});const b=blocks.get(key)!;
         if(!b.delta){const summary=(item.summary??[]).map((s:any)=>s.text??"").join("\n");if(summary)yield frame({type:"content_block_delta",index:b.index,delta:{type:"thinking_delta",thinking:summary}});}
         yield frame({type:"content_block_delta",index:b.index,delta:{type:"signature_delta",signature:carry(item,model)}});const end=close(key);if(end)yield end;

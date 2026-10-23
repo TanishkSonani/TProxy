@@ -8,6 +8,7 @@ const [status,summary,logs]=await Promise.all([get("/api/status"),get("/api/summ
 const rootResponse=await fetch(base+"/"),html=await rootResponse.text();
 const assets=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(m=>m[1]);
 if(assets.length<2)throw new Error("Missing UI assets");for(const path of assets){const r=await fetch(base+path);if(!r.ok)throw new Error("Missing UI asset");}
-if(!rootResponse.headers.get("set-cookie")?.includes("HttpOnly"))throw new Error("Missing dashboard session");
+if(rootResponse.headers.has("set-cookie"))throw new Error("Dashboard granted unauthenticated access");
+const session=await fetch(base+"/api/session",{method:"POST",headers:{Authorization:`Bearer ${key}`}});if(!session.headers.get("set-cookie")?.includes("HttpOnly"))throw new Error("Missing authenticated dashboard session");
 if((await fetch(base+"/api/status")).status!==401)throw new Error("Management authentication missing");
 console.log(JSON.stringify({account:status.auth.login,plan:status.auth.plan,driver:status.metrics.driver,requests:summary.totals.requests,input:summary.totals.input,output:summary.totals.output,latestModel:logs.requests[0]?.model,assets:assets.length},null,2));

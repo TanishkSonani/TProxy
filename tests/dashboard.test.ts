@@ -19,7 +19,10 @@ test("dashboard uses same-origin HttpOnly sessions and keeps management protecte
   const auth:any={status:{login:"fixture"},models:async()=>({data:[]}),stop(){}};const store=new MetricsStore(":memory:");let saved:any;
   const proxy=await startProxy(auth,{port,key:"fixture-secret",models:{default:"copilot-auto"},retentionDays:90},{metrics:store,saveSettings:v=>{saved=v;}}),base=`http://127.0.0.1:${port}`;
   try{
-    expect((await fetch(base+"/api/status")).status).toBe(401);const root=await fetch(base+"/");const cookie=root.headers.get("set-cookie")!;expect(cookie).toContain("HttpOnly");expect(cookie).toContain("SameSite=Strict");expect(await root.text()).not.toContain("fixture-secret");
+    expect((await fetch(base+"/api/status")).status).toBe(401);const root=await fetch(base+"/");expect(root.headers.get("set-cookie")).toBeNull();expect(await root.text()).not.toContain("fixture-secret");
+    expect((await fetch(base+"/api/session",{method:"POST"})).status).toBe(401);
+    const token=new URLSearchParams(new URL(proxy.dashboardURL).hash.slice(1)).get("session")!;
+    const handshake=await fetch(base+"/api/session",{method:"POST",headers:{Authorization:`Bearer ${token}`}}),cookie=handshake.headers.get("set-cookie")!;expect(cookie).toContain("HttpOnly");expect(cookie).toContain("SameSite=Strict");
     const headers={Cookie:cookie.split(";")[0]};expect((await fetch(base+"/api/status",{headers})).status).toBe(200);
     expect((await fetch(base+"/api/status",{headers:{...headers,Origin:"https://foreign.invalid"}})).status).toBe(403);
     expect((await fetch(base+"/api/status",{headers:{...headers,Host:`foreign.invalid:${port}`}})).status).toBe(403);

@@ -79,10 +79,27 @@ export class FileSecretStore implements SecretStore {
     finally {if(existsSync(temp))unlinkSync(temp);}
   }
 }
+// Enterprise session records can exceed the Windows generic-vault 5120-byte cap.
+// Fall back to a CurrentUser-DPAPI encrypted file, never a plaintext Windows file.
+export class WindowsProtectedStore implements SecretStore {
+  kind="windows-vault/dpapi-fallback";
+  private vault:WindowsCredentialStore;private file:string;
+  constructor(private directory:string,target:string){this.vault=new WindowsCredentialStore(target);this.file=join(directory,"credentials.dpapi");}
+  async read(){if(existsSync(this.file))return (await windowsUnprotect(readFileSync(this.file))).toString("utf8");return this.vault.read();}
+  async write(value:string){
+    if(Buffer.byteLength(value)<=5120){await this.vault.write(value);if(existsSync(this.file))unlinkSync(this.file);return;}
+    const encoded=await powershell(`Add-Type -AssemblyName System.Security
+$value=[Text.Encoding]::UTF8.GetBytes([Console]::In.ReadToEnd())
+$cipher=[Security.Cryptography.ProtectedData]::Protect($value,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)
+[Console]::Out.Write([Convert]::ToBase64String($cipher))`,value);
+    mkdirSync(this.directory,{recursive:true,mode:0o700});const temp=`${this.file}.${randomUUID()}.tmp`;
+    try{writeFileSync(temp,Buffer.from(encoded,"base64"),{flag:"wx",mode:0o600});renameSync(temp,this.file);}finally{if(existsSync(temp))unlinkSync(temp);}
+  }
+}
 
 export function secretStore(directory: string): SecretStore {
   const profile=createHash("sha256").update(directory).digest("hex").slice(0,24);
-  if(process.platform==="win32") return new WindowsCredentialStore(`ghcp-bridge:${profile}`);
+  if(process.platform==="win32") return new WindowsProtectedStore(directory,`ghcp-bridge:${profile}`);
   // Protected file is the explicitly supported fallback when an OS vault adapter is unavailable.
   return new FileSecretStore(directory);
 }

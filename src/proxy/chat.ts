@@ -65,7 +65,7 @@ export async function* chatStream(response:Response,model:string,onComplete:(val
   if(!complete||!finish)throw new ApiError(502,"api_error","Provider stream ended before completion");
   if(reasoningIndex!==undefined){yield frame({type:"content_block_delta",index:reasoningIndex,delta:{type:"signature_delta",signature:reasoningSignature(reasoning,model)}});yield frame({type:"content_block_stop",index:reasoningIndex});}
   if(textIndex!==undefined)yield frame({type:"content_block_stop",index:textIndex});
-  for(const call of calls.values()){if(!call.id||!call.name)throw new ApiError(502,"api_error","Provider returned incomplete tool metadata");const i=index++;yield frame({type:"content_block_start",index:i,content_block:{type:"tool_use",id:call.id,name:call.name,input:{}}});yield frame({type:"content_block_delta",index:i,delta:{type:"input_json_delta",partial_json:call.arguments}});yield frame({type:"content_block_stop",index:i});}
+  for(const call of calls.values()){if(!call.id||!call.name)throw new ApiError(502,"api_error","Provider returned incomplete tool metadata");try{JSON.parse(call.arguments);}catch{throw new ApiError(502,"api_error","Provider returned invalid tool arguments");}const i=index++;yield frame({type:"content_block_start",index:i,content_block:{type:"tool_use",id:call.id,name:call.name,input:{}}});yield frame({type:"content_block_delta",index:i,delta:{type:"input_json_delta",partial_json:call.arguments}});yield frame({type:"content_block_stop",index:i});}
   const mappedUsage=chatUsage(usage);yield frame({type:"message_delta",delta:{stop_reason:chatStop(finish),stop_sequence:null},usage:mappedUsage});
   onComplete({usage:mappedUsage,content:[...calls.values()].map(()=>({type:"tool_use"}))});yield frame({type:"message_stop"});
 }

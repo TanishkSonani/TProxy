@@ -3,10 +3,15 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { RequestRecord } from "../proxy/server";
 const safeEnums=new Set(["user","assistant","system","developer","text","image","tool_use","tool_result","thinking","enabled","disabled","adaptive"]);
-export function redactStructure(value:any,key=""):any {
-  if(Array.isArray(value))return value.slice(0,100).map(v=>redactStructure(v));
-  if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).slice(0,100).map(([k,v])=>[k,redactStructure(v,k)]));
+const protocolKeys=new Set(["model","messages","system","tools","tool_choice","metadata","content","role","type","text","name","id","tool_use_id","input","input_schema","thinking","signature","source","media_type","data","is_error","max_tokens","stream","temperature","top_p","stop_sequences","budget_tokens","output_config","format","schema","cache_control"]);
+const opaqueKeys=new Set(["input","input_schema","schema","metadata"]);
+export function redactStructure(value:any,key="",depth=0):any {
+  if(depth>16)return "[redacted: depth limit]";
+  if(opaqueKeys.has(key))return "[redacted: structured content]";
+  if(Array.isArray(value))return value.slice(0,100).map(v=>redactStructure(v,"",depth+1));
+  if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).slice(0,100).map(([k,v],i)=>[protocolKeys.has(k)?k:`[redacted key ${i}]`,redactStructure(v,k,depth+1)]));
   if(typeof value==="string")return ["type","role"].includes(key)&&safeEnums.has(value)?value:`[redacted: ${value.length} chars]`;
+  if(typeof value==="number"&&!["max_tokens","budget_tokens","temperature","top_p"].includes(key))return "[redacted: number]";
   return value;
 }
 export class MetricsStore {

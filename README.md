@@ -12,7 +12,7 @@ Current acceptance scope is Windows + Copilot Free + Auto; native Claude entitle
 .\dist\ghcp-bridge-windows-x64.exe start
 ```
 
-Open [the dashboard](http://127.0.0.1:4141). In another terminal:
+Open the private dashboard link printed by `start`. To get a link again, run `ghcp-bridge-windows-x64.exe dashboard`. Opening the bare localhost URL shows an access screen; it does not grant management access. In another terminal:
 
 ```powershell
 .\dist\ghcp-bridge-windows-x64.exe claude
@@ -22,13 +22,14 @@ The launcher reuses the installed `claude`, prepares first-run onboarding and su
 
 ```powershell
 .\dist\ghcp-bridge-windows-x64.exe status
+.\dist\ghcp-bridge-windows-x64.exe dashboard
 .\dist\ghcp-bridge-windows-x64.exe stop
 .\dist\ghcp-bridge-windows-x64.exe auth
 .\dist\ghcp-bridge-windows-x64.exe env
 .\dist\ghcp-bridge-windows-x64.exe claude -- --model copilot-auto
 ```
 
-`start` runs in the foreground. `claude` can start an owned proxy and stop it when Claude exits. There is no tray or autostart service. Commands accept `--port N`, `--config FILE` and `--data-dir DIR`. Default Windows storage is `%LOCALAPPDATA%\ghcp-bridge`; credentials are in Windows Credential Manager. Retention defaults to 90 days. A small runtime file tracks the active port when a saved port change is pending.
+`start` runs in the foreground. `claude` can start an owned proxy and stop it when Claude exits or setup fails. There is no tray or autostart service. Commands accept `--port N`, `--config FILE` and `--data-dir DIR`. Default Windows storage is `%LOCALAPPDATA%\ghcp-bridge`; credentials use Windows Credential Manager, with a CurrentUser-DPAPI encrypted-file fallback for records beyond the vault's size limit. Retention defaults to 90 days. A small runtime file tracks the active port when a saved port change is pending. Keep custom data directories private; launcher settings there include the local proxy key.
 
 `env` prints shell settings, including a secret local proxy key. Keep that output out of logs/source control. It sets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL` and model slots, and clears conflicting API-key/OAuth/provider variables. Environment setup alone can still show first-run onboarding. A complete audit that Claude makes no Anthropic/background connections remains pending.
 
@@ -36,7 +37,7 @@ The launcher reuses the installed `claude`, prepares first-run onboarding and su
 
 Order: `GH_TOKEN` / `GITHUB_TOKEN`, `gh auth token`, Windows VS Code GitHub session, then explicit OAuth device authorization. Existing logins are tried before offering device flow. Copilot tokens refresh and are cached in the Windows vault. macOS/Linux currently use a restricted 0600-file fallback; their VS Code session decryption is not implemented.
 
-The upstream host comes from token exchange endpoints, including business/enterprise hosts. Configure `auth.githubHost` for EMU, or select a logged-in gh host. Multiple identities require a choice. Copilot discovery uses manifest identity across bundled/versioned, portable, Stable/Insiders, custom and PATH layouts. Extension location and sign-in storage are separate.
+The upstream host comes from token exchange endpoints, including business/enterprise hosts. Configure `auth.githubHost` for EMU, or select a logged-in gh host. Multiple identities require a choice. Copilot discovery uses manifest identity across bundled/versioned, portable, Stable/Insiders, custom and PATH layouts. Extension location and sign-in storage are separate. Malformed configuration types are rejected and saves are atomic. An explicit `--data-dir` overrides the file's directory. Use separate profiles/directories for separate accounts.
 
 Example configuration; every auth override is optional:
 
@@ -65,7 +66,7 @@ The launcher fetches fresh Copilot `/models` metadata and resolves `/auto` when 
 
 Five offline React views: Status, Usage, Live log, Limits and Settings. They display account/auth/TTL, shell setup, per-model totals, activity heatmap, daily series, p50/p95 latency, errors, tool ratio, session spans, redacted requests, refresh events, observed headers and returned account quota. Premium estimates are N/A; billing is not invented. Model mappings apply immediately; port changes require restart.
 
-Request-body string values are redacted before SQLite insertion. This preview uses Bun's `bun:sqlite` because `better-sqlite3` failed to install without Windows C++ tools. The user approved this driver change; see [M3 findings](evidence/M3-DASHBOARD.md). Management requires a local session or proxy key even when model API-key enforcement is disabled. No external fonts, scripts, CDN calls or dashboard telemetry are used.
+New request logs redact string values, arbitrary keys, nested tool inputs and non-protocol numbers before SQLite insertion. This preview uses Bun's `bun:sqlite` because `better-sqlite3` failed to install without Windows C++ tools. The user approved this driver change; see [M3 findings](evidence/M3-DASHBOARD.md). Management requires an authenticated dashboard link/session or proxy key even when model API-key enforcement is disabled. Dashboard links are credentials: keep them private. The fragment is removed after the local session handshake and is not sent as a query parameter. No external fonts, scripts, CDN calls or dashboard telemetry are used.
 
 ## Develop and build
 
@@ -92,5 +93,7 @@ For source execution, run `bun run build:ui`, then `bun run start` and `bun run 
 - Refresh coverage simulates 35 days; it is not a completed soak. Visual browser QA and a complete process-level egress audit remain pending. Managed corporate settings can prevent provider redirection.
 
 Reuse is tracked in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); `ghcp-bridge licenses` prints bundled notices.
+
+The [real-world hardening review](evidence/REAL-WORLD-REVIEW.md) compares pinned reference implementations, lists regression coverage and separates remaining limitations from completed fixes. Local managed settings and extra `--settings` files are checked for routing conflicts before Claude starts; policies are never edited. Dynamic policy helpers require administrator verification rather than being bypassed. This is a conservative preflight, not a complete policy-engine replacement.
 
 Unsupported by GitHub. Use may violate Copilot terms and corporate policy, may be audit-logged, and may risk seat enforcement. Keep usage interactive and low-volume. Account entitlements and organization policy are never bypassed.

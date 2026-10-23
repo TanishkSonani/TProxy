@@ -1,5 +1,5 @@
 import { expect,test } from "bun:test";
-import { TokenManager,copilotOrigin } from "../src/auth/token-manager";
+import { TokenManager,copilotOrigin,CredentialRejected } from "../src/auth/token-manager";
 import { DeviceFlow } from "../src/auth/device-flow";
 import type { SecretStore } from "../src/auth/secure-store";
 import { githubApi } from "../src/auth/providers";
@@ -48,4 +48,17 @@ test("device authorization honors pending/slow_down and returns only after appro
   const credential=await flow.poll({device_code:"fixture",user_code:"CODE",verification_uri:"https://github.com/login/device",expires_in:100,interval:1},
     {now:()=>now,sleep:async ms=>{waits.push(ms);now+=ms;}});
   expect(waits).toEqual([1000,1000,6000]);expect(credential.source).toBe("device-flow");
+});
+test("expired or inconsistent cached tokens are refreshed even if refreshAt claims to be in the future",async()=>{
+  const h=harness(),first=await h.manager().initialize();first.stop();const cached=JSON.parse(h.store.value!);cached.copilot.expiresAt=h.deps.now()-1;cached.copilot.refreshAt=h.deps.now()+3600000;h.store.value=JSON.stringify(cached);
+  const second=await h.manager().initialize();expect(h.calls()).toBe(2);expect((await second.get()).token).toBe("copilot-2");second.stop();
+});
+test("expires_at without refresh_in remains usable with a safe refresh margin",async()=>{
+  const h=harness(),original=h.deps.fetch;const manager=new TokenManager(h.store,{}, {...h.deps,fetch:(async(url:any,init:any)=>{const response=await original(url,init);if(String(url).endsWith("/v2/token")){const data=await response.json();delete data.refresh_in;return Response.json(data);}return response;}) as any});
+  await manager.initialize();expect(manager.status.refreshAt!<manager.status.expiresAt!).toBe(true);expect((await manager.get()).token).toBe("copilot-1");manager.stop();
+});
+test("credential revocation is not hidden by falling back to a still-unexpired Copilot token",async()=>{
+  const h=harness(),original=h.deps.fetch;let revoked=false;
+  const manager=new TokenManager(h.store,{}, {...h.deps,fetch:(async(url:any,init:any)=>revoked&&String(url).endsWith("/v2/token")?new Response("",{status:401}):original(url,init)) as any});
+  await manager.initialize();h.advance(3550000);revoked=true;await expect(manager.get()).rejects.toBeInstanceOf(CredentialRejected);expect(manager.status.expiresAt).toBeUndefined();manager.stop();
 });

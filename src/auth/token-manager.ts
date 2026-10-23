@@ -3,6 +3,7 @@ import type { SecretStore } from "./secure-store";
 
 export type CopilotToken = { token: string; api: string; expiresAt: number; refreshAt: number };
 type Cache = { version:1; credential:Credential; copilot:CopilotToken };
+export class CredentialRejected extends Error {constructor(readonly status:number){super("GitHub credential was rejected; reconnect GitHub");}}
 export type AuthStatus = { source?:string; login?:string; host?:string; api?:string; expiresAt?:number;
   refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; refreshEvents:{at:number;ok:boolean}[] };
 export function copilotOrigin(value: unknown): string {
@@ -42,7 +43,7 @@ export class TokenManager {
     if(!this.credential)throw new Error("AUTH_REQUIRED: no reusable GitHub login; run ghcp-bridge auth");
     githubApi(this.credential.host);
     this.status={...this.status,source:this.credential.source,login:this.credential.login,host:this.credential.host};
-    if(cached?.version===1 && cached.credential.token===this.credential.token && cached.copilot.refreshAt>this.now()) {
+    if(cached?.version===1 && cached.credential.token===this.credential.token && cached.copilot.refreshAt>this.now() && cached.copilot.expiresAt>this.now() && cached.copilot.refreshAt<cached.copilot.expiresAt) {
       copilotOrigin(cached.copilot.api);this.token=cached.copilot;this.publish();this.schedule();
     } else await this.refresh();
     await this.account();
@@ -71,12 +72,13 @@ export class TokenManager {
             this.credential=renewed;response=await this.request(githubApi(renewed.host)+"/copilot_internal/v2/token",renewed.token,true);
           }
         }
+        if(response.status===401||response.status===403){this.token=undefined;this.status.expiresAt=undefined;this.status.refreshAt=undefined;throw new CredentialRejected(response.status);}
         if(!response.ok)throw new Error(`GitHub token exchange rejected (${response.status})`);
         const data=await response.json() as any;
         if(typeof data.token!=="string"||!data.token)throw new Error("Malformed Copilot token exchange");
         const api=copilotOrigin(data.endpoints?.api),now=this.now();
         const expiresAt=Number.isFinite(Number(data.expires_at))?Number(data.expires_at)*1000:now+Number(data.refresh_in)*1000;
-        const refreshAt=Math.min(expiresAt-60000,now+Math.max(1,Number(data.refresh_in)-60)*1000);
+        const refreshIn=Number(data.refresh_in),refreshAt=Math.min(expiresAt-Math.min(60000,Math.max(1000,(expiresAt-now)/10)),Number.isFinite(refreshIn)&&refreshIn>0?now+Math.max(1,refreshIn-60)*1000:Infinity);
         if(!Number.isFinite(expiresAt)||!Number.isFinite(refreshAt)||expiresAt<=now)throw new Error("Invalid token expiry");
         const token={token:data.token,api,expiresAt,refreshAt};
         await this.store.write(JSON.stringify({version:1,credential:this.credential,copilot:token}));
@@ -89,7 +91,7 @@ export class TokenManager {
   onRefresh(listener:(event:{at:number;ok:boolean})=>void){this.listeners.add(listener);return ()=>this.listeners.delete(listener);}
   private event(ok:boolean){const event={at:this.now(),ok};this.status.refreshEvents.push(event);this.status.refreshEvents=this.status.refreshEvents.slice(-100);for(const listener of this.listeners){try{listener(event);}catch{}}}
   async get():Promise<CopilotToken> {
-    if(!this.token||this.token.refreshAt<=this.now()) {
+    if(!this.token||this.token.refreshAt<=this.now()||this.token.expiresAt<=this.now()) {
       try{return await this.refresh();}catch(error){if(!this.token||this.token.expiresAt<=this.now())throw error;}
     }
     return this.token!;

@@ -11,3 +11,6 @@ Live check on 2026-10-23: `bun scripts/auth-check.ts` reused the existing VS Cod
 Tests cover concurrent refresh, cache restart, malformed cache/account mismatch, origin validation, valid-versus-expired failure behavior, device-flow pending/slow_down, and **35 days of simulated lazy refresh**. This is not a completed 35-day real-time soak or paid/enterprise verification.
 
 Remaining integration: CLI/dashboard auth lifecycle and persisted refresh-event metrics. macOS/Linux VS Code secret decryption and OS keychain adapters are not yet implemented; env/gh work independently and the restricted 0600-file cache is their current fallback. These platform gaps must be resolved or documented before cross-platform packaging is called complete.
+# Windows credential-size update
+
+Records larger than Windows Credential Manager's 5,120-byte blob limit now use a CurrentUser-DPAPI encrypted file in the profile directory. Small existing vault records keep the same target IDs and remain readable. A synthetic oversized record was encrypted, checked for absence of plaintext, and read back successfully on this host. No plaintext Windows fallback was added. Expired/inconsistent cache timestamps, missing refresh_in and explicit credential rejection now have regression coverage; see [hardening review](REAL-WORLD-REVIEW.md).
