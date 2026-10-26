@@ -5,7 +5,7 @@ export type CopilotToken = { token: string; api: string; expiresAt: number; refr
 type Cache = { version:1; credential:Credential; copilot:CopilotToken };
 export class CredentialRejected extends Error {constructor(readonly status:number){super("GitHub credential was rejected; reconnect GitHub");}}
 export type AuthStatus = { source?:string; login?:string; host?:string; api?:string; expiresAt?:number;
-  refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; quotaUpdatedAt?:number;
+  refreshAt?:number; storage:string; plan?:string; sku?:string; organizations?:unknown; quota?:unknown; quotaUpdatedAt?:number; usageBasedBilling?:boolean;
   quotaRefresh?:{state:"refreshing"|"ready"|"error";attemptedAt:number;nextAttemptAt?:number;message?:string};
   refreshEvents:{at:number;ok:boolean}[] };
 export function copilotOrigin(value: unknown): string {
@@ -112,6 +112,7 @@ export class TokenManager {
     if(!data?.quota_snapshots||typeof data.quota_snapshots!=="object"||Array.isArray(data.quota_snapshots))return false;
     for(const [field,key]of [["plan","copilot_plan"],["sku","access_type_sku"],["organizations","organization_login_list"]] as const)if(data[key]!==undefined)(this.status as any)[field]=data[key];
     const at=this.now();this.status.quota=data.quota_snapshots;this.status.quotaUpdatedAt=at;
+    this.status.usageBasedBilling=data.token_based_billing===true;
     this.status.quotaRefresh={state:"ready",attemptedAt:at,nextAttemptAt:at+15000};this.quotaFailures=0;return true;
   }
   async refreshQuota():Promise<AuthStatus>{

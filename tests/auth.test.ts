@@ -101,3 +101,13 @@ test("credential revocation is not hidden by falling back to a still-unexpired C
   const manager=new TokenManager(h.store,{}, {...h.deps,fetch:(async(url:any,init:any)=>revoked&&String(url).endsWith("/v2/token")?new Response("",{status:401}):original(url,init)) as any});
   await manager.initialize();h.advance(3550000);revoked=true;await expect(manager.get()).rejects.toBeInstanceOf(CredentialRejected);expect(manager.status.expiresAt).toBeUndefined();manager.stop();
 });
+
+
+test("quota discovery and refresh retain billing mode and exact credit snapshot",async()=>{
+  const h=harness(),original=h.deps.fetch;
+  const quota={premium_interactions:{entitlement:1900,quota_remaining:1425.25,percent_remaining:75,unlimited:false,has_quota:false}};
+  const manager=new TokenManager(h.store,{}, {...h.deps,fetch:(async(url:any,init:any)=>String(url).endsWith("/copilot_internal/user")?Response.json({token_based_billing:true,quota_snapshots:quota}):original(url,init)) as any});
+  try{await manager.initialize();expect(manager.status.usageBasedBilling).toBe(true);expect(manager.status.quota).toEqual(quota);
+    h.advance(16000);await manager.refreshQuota();expect(manager.status.usageBasedBilling).toBe(true);expect(manager.status.quota).toEqual(quota);
+  }finally{manager.stop();}
+});

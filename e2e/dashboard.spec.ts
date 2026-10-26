@@ -1,5 +1,4 @@
 import {test,expect} from "@playwright/test";
-+
 test("quotas refresh on entry, every 30 seconds and on return, with hidden-page polling paused",async({page})=>{
   await page.clock.install({time:new Date()});
   const calls=await fixture(page),count=()=>calls.filter(c=>new URL(c.url).pathname==="/api/quota").length;
@@ -22,7 +21,7 @@ test("quotas refresh on entry, every 30 seconds and on return, with hidden-page 
 
 
 const secret="synthetic-local-secret-not-a-real-credential";
-async function fixture(page:any,startup?:any) {
+async function fixture(page:any,startup?:any,quotaAuth?:any) {
   const now=Date.now(),day=new Date().toLocaleDateString("en-CA");
   const requests=Array.from({length:8},(_,i)=>({id:"fixture-"+i,at:now-i*50000,model:i%2?"gpt-fixture":"copilot-auto",status:i===3?429:200,input:1200+i*100,output:230,tools:i%2,latency:1200+i*100,body:JSON.stringify({messages:[{role:"user",content:"[redacted: 20 chars]"}]})}));
   let settings={port:4141,retentionDays:90,requireApiKey:true,models:{default:"copilot-auto",sonnet:"copilot-auto",opus:"copilot-auto",haiku:"copilot-auto"}};
@@ -39,6 +38,7 @@ async function fixture(page:any,startup?:any) {
       env:{script:'$env:ANTHROPIC_BASE_URL="http://localhost:4141"\n$env:ANTHROPIC_AUTH_TOKEN="'+secret+'"\n$env:ANTHROPIC_MODEL="copilot-auto"'},
       refresh:{ok:true}
     };
+    if(quotaAuth)Object.assign(result.status.auth,quotaAuth);
     result.quota={...result.status.auth,quotaRefresh:{state:"ready",attemptedAt:now,nextAttemptAt:now+15000}};
     if(path==="settings") {if(request.method()==="POST")settings=request.postDataJSON();await route.fulfill({json:settings});}
     else if(path in result)await route.fulfill({json:result[path]});
@@ -143,4 +143,27 @@ test("activity map shows a compact full year with GitHub-style months at every r
   }
   await page.setViewportSize({width:1440,height:1000});
   await page.locator(".panel").filter({has:page.getByRole("heading",{name:"Activity map",exact:true})}).screenshot({path:testInfo.outputPath("full-year-activity-map.png")});
+});
+
+
+test("corporate credit cards show percentage and reveal remaining credits with keyboard support",async({page})=>{
+  await fixture(page,undefined,{usageBasedBilling:true,quota:{premium_interactions:{entitlement:1900,quota_remaining:1425.25,percent_remaining:75,has_quota:false,unlimited:true},completions:{entitlement:-1,unlimited:true}}});
+  await page.getByRole("button",{name:"Limits",exact:true}).click();
+  const card=page.locator(".quota-card").filter({has:page.getByRole("heading",{name:"AI credits",exact:true})});
+  const button=card.getByRole("button",{name:"AI credits remaining quota details"});
+  await expect(button).toContainText("75.01%");
+  await expect(button).toHaveAttribute("aria-expanded","false");
+  await button.click();
+  await expect(card.getByRole("region")).toContainText("1,425.25 / 1,900 credits remaining");
+  await button.press("Enter");await expect(card.getByRole("region")).toHaveCount(0);
+  await button.press("Space");await expect(button).toHaveAttribute("aria-expanded","true");
+  await expect(card).not.toContainText("Unlimited");
+});
+
+test("organization pools without a denominator do not claim unlimited credit access",async({page})=>{
+  await fixture(page,undefined,{usageBasedBilling:true,quota:{premium_interactions:{entitlement:0,unlimited:true,credits_used:25.5,percent_remaining:100}}});
+  await page.getByRole("button",{name:"Limits",exact:true}).click();
+  const card=page.locator(".quota-card");await expect(card).toContainText("25.5 used");
+  await expect(card).toContainText("remaining / total not reported by GitHub");
+  await expect(card).not.toContainText("Unlimited");await expect(card.locator("meter")).toHaveCount(0);
 });

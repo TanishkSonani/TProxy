@@ -1,6 +1,6 @@
 # TProxy
 
-Current version: **1.0.1**, the environment-trust architecture release. Compatibility remains a preview within the tested scope below.
+Current version: **1.0.2**, with credit-aware quota cards and remaining / total details. Compatibility remains a preview within the tested scope below.
 
 A local gateway that connects your installed Claude Code CLI to models available through your GitHub Copilot account. Claude models use Copilot's native Messages endpoint; other models use Responses or Chat Completions adapters. An offline dashboard stores usage in local SQLite.
 
@@ -127,6 +127,10 @@ Source lives in `src/`, dashboard code in `dashboard/`, regression tests in `tes
 `test:ui` uses installed Google Chrome in headless mode with synthetic API responses. It checks secret handling, confirmation, filters, live-log pause/resume, chart descriptions and desktop/mobile layouts. Screenshots and traces stay in ignored `test-results/`. These tests make no Copilot model calls.
 
 ## Privacy and compatibility
+
+On **Limits**, select a remaining-percentage card to expand remaining / total credits (or requests on legacy plans). Values come from the account snapshot, not a fixed plan allowance. Fractional `quota_remaining` is preserved; counts inferred only from a rounded percentage are marked approximate. Credit billing does not interpret `has_quota: false` as proof that no allowance exists. Organization pools without a reported denominator show that the remaining / total is unknown, rather than claiming unlimited credits. Unlimited inline suggestions are separate from the credit allowance.
+
+Quota parsing follows the fields used by [VS Code's entitlement service](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/services/chat/common/chatEntitlementService.ts): `token_based_billing`, `entitlement`, `quota_remaining`, and `percent_remaining`. Aggregate `credits_used` is never subtracted from a per-user allowance. GitHub may delay updates or omit organization budget details; TProxy cannot reconstruct an unreported budget.
 
 TProxy binds to localhost and adds no third-party telemetry or dashboard CDN calls. Model requests go to GitHub/Copilot; authentication also contacts GitHub. Metrics remain local in SQLite WAL with redacted request content. Dashboard management requires a private authenticated link/session or proxy key.
 
