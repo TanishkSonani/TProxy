@@ -23,6 +23,21 @@ async function command(args: string[]) {
   finally{clearTimeout(timer);}
 }
 
+type VSCodeSession={accessToken:string;account:{label:string;id?:string};scopes?:string[]};
+export function selectVSCodeSession(value:unknown,account?:string):VSCodeSession|null {
+  if(!Array.isArray(value))return null;
+  const matches=value.filter((s):s is VSCodeSession=>typeof s?.accessToken==="string"&&!!s.accessToken.trim()&&
+    typeof s.account?.label==="string"&&!!s.account.label.trim()&&
+    (!account||s.account.label.toLowerCase()===account.trim().toLowerCase()));
+  const labels=new Set(matches.map(s=>s.account.label.toLowerCase()));
+  const ids=new Set(matches.map(s=>s.account.id).filter(id=>typeof id==="string"&&id.length));
+  if(labels.size>1||ids.size>1)throw new Error("Multiple VS Code accounts found; select account in configuration");
+  // VS Code stores separate OAuth sessions for different scope sets on the same
+  // account. Prefer its basic identity session without requiring additional scopes.
+  const scopes=(s:VSCodeSession)=>Array.isArray(s.scopes)?s.scopes.filter(x=>typeof x==="string"):[];
+  return matches.sort((a,b)=>Number(scopes(b).includes("read:user"))-Number(scopes(a).includes("read:user"))||scopes(a).length-scopes(b).length)[0]??null;
+}
+
 export async function vscodeCredential(options: AuthOptions): Promise<Credential | null> {
   if(process.platform!=="win32")return null;
   const appData=process.env.APPDATA??join(homedir(),"AppData/Roaming");
@@ -53,9 +68,8 @@ export async function vscodeCredential(options: AuthOptions): Promise<Credential
           if(bytes.subarray(0,3).toString()!=="v10")continue;
           const decipher=createDecipheriv("aes-256-gcm",key,bytes.subarray(3,15));decipher.setAuthTag(bytes.subarray(-16));
           const sessions=JSON.parse(Buffer.concat([decipher.update(bytes.subarray(15,-16)),decipher.final()]).toString());
-          const matches=sessions.filter((item:any)=>item.accessToken && (!options.account || item.account?.label===options.account));
-          if(matches.length>1)throw new Error("Multiple VS Code accounts found; select account in configuration");
-          if(matches.length===1)return {token:matches[0].accessToken,source:"vscode",host:options.githubHost??"github.com",login:matches[0].account?.label};
+          const selected=selectVSCodeSession(sessions,options.account);
+          if(selected)return {token:selected.accessToken,source:"vscode",host:options.githubHost??"github.com",login:selected.account.label};
         }
       } catch(error) {if(error instanceof Error && error.message.startsWith("Multiple"))throw error;}
       finally {db?.close();}

@@ -1,6 +1,6 @@
 # TProxy
 
-Current version: **1.0.2**, with credit-aware quota cards and remaining / total details. Compatibility remains a preview within the tested scope below.
+Current version: **1.0.3**, with credit-aware quota cards and remaining / total details. Compatibility remains a preview within the tested scope below.
 
 A local gateway that connects your installed Claude Code CLI to models available through your GitHub Copilot account. Claude models use Copilot's native Messages endpoint; other models use Responses or Chat Completions adapters. An offline dashboard stores usage in local SQLite.
 

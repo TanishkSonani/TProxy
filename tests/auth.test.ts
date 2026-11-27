@@ -2,7 +2,7 @@ import { expect,test } from "bun:test";
 import { TokenManager,copilotOrigin,CredentialRejected } from "../src/auth/token-manager";
 import { DeviceFlow } from "../src/auth/device-flow";
 import type { SecretStore } from "../src/auth/secure-store";
-import { githubApi,existingCredential } from "../src/auth/providers";
+import { githubApi,existingCredential,selectVSCodeSession } from "../src/auth/providers";
 test("pinned Copilot identity does not select the unrelated active Git publishing account",async()=>{
   const calls:string[][]=[],vscode={token:"vscode-fixture",source:"vscode",host:"github.com",login:"copilot-user"};
   const credential=await existingCredential({githubHost:"github.com",account:"copilot-user"},{env:{},ghAvailable:true,
@@ -110,4 +110,17 @@ test("quota discovery and refresh retain billing mode and exact credit snapshot"
   try{await manager.initialize();expect(manager.status.usageBasedBilling).toBe(true);expect(manager.status.quota).toEqual(quota);
     h.advance(16000);await manager.refreshQuota();expect(manager.status.usageBasedBilling).toBe(true);expect(manager.status.quota).toEqual(quota);
   }finally{manager.stop();}
+});
+
+
+test("VS Code scope sessions for a pinned account are not mistaken for multiple accounts",()=>{
+  const account={id:"123",label:"2861176_TCSIND1"};
+  const sessions=[{accessToken:"broad-fixture",account,scopes:["repo","read:user","user:email"]},{accessToken:"identity-fixture",account,scopes:["read:user","user:email"]},{accessToken:"other-fixture",account:{id:"456",label:"other"}}];
+  expect(selectVSCodeSession(sessions,"2861176_tcsind1")?.accessToken).toBe("identity-fixture");
+  expect(selectVSCodeSession(sessions.slice(0,2))?.account.id).toBe("123");
+  expect(()=>selectVSCodeSession(sessions)).toThrow("Multiple VS Code accounts");
+  expect(selectVSCodeSession(sessions,"missing")).toBeNull();
+  expect(selectVSCodeSession(null)).toBeNull();
+  expect(selectVSCodeSession([{accessToken:3,account},null,{accessToken:"",account}])).toBeNull();
+  expect(()=>selectVSCodeSession([{accessToken:"a",account},{accessToken:"b",account:{...account,id:"999"}}],account.label)).toThrow("Multiple VS Code accounts");
 });
